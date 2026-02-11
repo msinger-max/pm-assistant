@@ -156,11 +156,11 @@ export async function GET(request: NextRequest) {
     const weeks = Math.max(1, daysDiff / 7);
     const avgVelocity = Math.round((ticketsCompleted / weeks) * 10) / 10;
 
-    // Created by assignee (using creator field)
+    // Created tickets by assignee (who has them assigned)
     const createdByAssignee: Record<string, number> = {};
     createdIssues.forEach((issue) => {
-      const creator = issue.fields.creator?.displayName || "Unassigned";
-      createdByAssignee[creator] = (createdByAssignee[creator] || 0) + 1;
+      const assignee = issue.fields.assignee?.displayName || "Unassigned";
+      createdByAssignee[assignee] = (createdByAssignee[assignee] || 0) + 1;
     });
 
     // Completed by assignee
