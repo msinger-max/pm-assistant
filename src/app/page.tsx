@@ -17,7 +17,6 @@ const PROJECTS = [
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("board");
   const [activeProject, setActiveProject] = useState(PROJECTS[0]);
-  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
 
   const tabs = [
     { id: "board" as Tab, label: "Board", icon: "📋" },
@@ -54,75 +53,34 @@ export default function Home() {
         </nav>
 
         {/* Project Selector */}
-        <div className="mt-8 relative">
+        <div className="mt-8">
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">
             Project
           </h3>
-          <button
-            onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-            className="w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg flex items-center gap-3 transition-colors"
-          >
-            <div
-              className={`w-8 h-8 ${activeProject.color} rounded flex items-center justify-center text-white text-xs font-bold`}
-            >
-              {activeProject.key.substring(0, 2)}
-            </div>
-            <span className="font-medium text-gray-900 flex-1 text-left">
-              {activeProject.name}
-            </span>
-            <svg
-              className={`w-4 h-4 text-gray-400 transition-transform ${
-                projectDropdownOpen ? "rotate-180" : ""
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-
-          {projectDropdownOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-              {PROJECTS.map((project) => (
-                <button
-                  key={project.key}
-                  onClick={() => {
-                    setActiveProject(project);
-                    setProjectDropdownOpen(false);
-                  }}
-                  className={`w-full p-3 flex items-center gap-3 hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg ${
-                    activeProject.key === project.key ? "bg-blue-50" : ""
-                  }`}
+          <div className="space-y-2">
+            {PROJECTS.map((project) => (
+              <button
+                key={project.key}
+                onClick={() => setActiveProject(project)}
+                className={`w-full p-3 rounded-lg flex items-center gap-3 transition-colors ${
+                  activeProject.key === project.key
+                    ? "bg-blue-50 ring-2 ring-blue-200"
+                    : "bg-gray-50 hover:bg-gray-100"
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 ${project.color} rounded flex items-center justify-center text-white text-xs font-bold`}
                 >
-                  <div
-                    className={`w-8 h-8 ${project.color} rounded flex items-center justify-center text-white text-xs font-bold`}
-                  >
-                    {project.key.substring(0, 2)}
-                  </div>
-                  <span className="font-medium text-gray-900">{project.name}</span>
-                  {activeProject.key === project.key && (
-                    <svg
-                      className="w-4 h-4 text-blue-600 ml-auto"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+                  {project.key.substring(0, 2)}
+                </div>
+                <span className={`font-medium ${
+                  activeProject.key === project.key ? "text-blue-700" : "text-gray-900"
+                }`}>
+                  {project.name}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </aside>
 
