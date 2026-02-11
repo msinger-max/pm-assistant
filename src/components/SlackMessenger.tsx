@@ -21,7 +21,7 @@ interface SlackMessengerProps {
 
 export default function SlackMessenger({ darkMode = false }: SlackMessengerProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTarget, setSelectedTarget] = useState<SlackTarget | null>(null);
+  const [selectedTargets, setSelectedTargets] = useState<SlackTarget[]>([]);
   const [suggestions, setSuggestions] = useState<SlackTarget[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -59,7 +59,11 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
       try {
         const response = await fetch(`/api/slack/channels?q=${encodeURIComponent(searchQuery)}`);
         const data = await response.json();
-        setSuggestions(data.results || []);
+        // Filter out already selected targets
+        const filtered = (data.results || []).filter(
+          (item: SlackTarget) => !selectedTargets.some(t => t.id === item.id)
+        );
+        setSuggestions(filtered);
       } catch (error) {
         console.error("Error searching channels:", error);
         setSuggestions([]);
@@ -70,59 +74,92 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
 
     const debounce = setTimeout(searchChannels, 300);
     return () => clearTimeout(debounce);
-  }, [searchQuery]);
+  }, [searchQuery, selectedTargets]);
 
   const handleSelectTarget = (target: SlackTarget) => {
-    setSelectedTarget(target);
-    setSearchQuery(target.name);
+    setSelectedTargets(prev => [...prev, target]);
+    setSearchQuery("");
+    setSuggestions([]);
     setShowSuggestions(false);
   };
 
+  const handleRemoveTarget = (targetId: string) => {
+    setSelectedTargets(prev => prev.filter(t => t.id !== targetId));
+  };
+
   const handleSend = async () => {
-    if (!selectedTarget || !message.trim()) return;
+    if (selectedTargets.length === 0 || !message.trim()) return;
 
     setIsSending(true);
     setSendResult(null);
 
-    try {
-      const response = await fetch("/api/slack/send-message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          channelId: selectedTarget.id,
-          message: message.trim(),
-        }),
-      });
+    const results: { target: string; success: boolean; error?: string }[] = [];
 
-      const data = await response.json();
+    // Send to all selected targets
+    for (const target of selectedTargets) {
+      try {
+        const response = await fetch("/api/slack/send-message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            channelId: target.id,
+            message: message.trim(),
+          }),
+        });
 
-      if (response.ok && data.success) {
-        const newMessage: RecentMessage = {
-          id: Date.now().toString(),
-          target: selectedTarget.name,
-          message: message.trim(),
-          timestamp: new Date().toLocaleTimeString(),
-        };
-        setRecentMessages((prev) => [newMessage, ...prev].slice(0, 5));
-        setMessage("");
-        setSendResult({ success: true, message: `Message sent to ${selectedTarget.name}!` });
-      } else {
-        setSendResult({ success: false, message: data.error || "Failed to send message" });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          results.push({ target: target.name, success: true });
+          const newMessage: RecentMessage = {
+            id: `${Date.now()}-${target.id}`,
+            target: target.name,
+            message: message.trim(),
+            timestamp: new Date().toLocaleTimeString(),
+          };
+          setRecentMessages((prev) => [newMessage, ...prev].slice(0, 10));
+        } else {
+          results.push({ target: target.name, success: false, error: data.error });
+        }
+      } catch (error) {
+        console.error("Error sending message:", error);
+        results.push({ target: target.name, success: false, error: "Connection error" });
       }
-    } catch (error) {
-      console.error("Error sending message:", error);
-      setSendResult({ success: false, message: "Error connecting to Slack" });
-    } finally {
-      setIsSending(false);
     }
+
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+
+    if (failCount === 0) {
+      setSendResult({
+        success: true,
+        message: `Message sent to ${successCount} recipient${successCount > 1 ? 's' : ''}!`
+      });
+      setMessage("");
+      setSelectedTargets([]);
+    } else if (successCount === 0) {
+      setSendResult({
+        success: false,
+        message: `Failed to send to all ${failCount} recipient${failCount > 1 ? 's' : ''}`
+      });
+    } else {
+      setSendResult({
+        success: true,
+        message: `Sent to ${successCount}, failed for ${failCount}`
+      });
+      setMessage("");
+      setSelectedTargets([]);
+    }
+
+    setIsSending(false);
   };
 
   const handleQuickMessage = (text: string) => {
     setMessage(text);
   };
 
-  const clearSelection = () => {
-    setSelectedTarget(null);
+  const clearAllSelections = () => {
+    setSelectedTargets([]);
     setSearchQuery("");
     setSuggestions([]);
   };
@@ -157,90 +194,99 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
       {/* Message Form */}
       <div className={`rounded-2xl p-6 mb-6 border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
         <div className="mb-4" ref={searchRef}>
-          <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-slate-300" : "text-gray-700"}`}>
-            Channel or User
-          </label>
-          <div className="relative">
-            {selectedTarget ? (
-              <div className={`flex items-center justify-between px-4 py-2 rounded-xl border ${
-                darkMode ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200"
-              }`}>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                    selectedTarget.type === "channel"
+          <div className="flex items-center justify-between mb-1">
+            <label className={`block text-sm font-medium ${darkMode ? "text-slate-300" : "text-gray-700"}`}>
+              Recipients
+            </label>
+            {selectedTargets.length > 0 && (
+              <button
+                onClick={clearAllSelections}
+                className={`text-xs ${darkMode ? "text-slate-400 hover:text-slate-300" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          {/* Selected targets */}
+          {selectedTargets.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {selectedTargets.map((target) => (
+                <div
+                  key={target.id}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
+                    target.type === "channel"
                       ? darkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"
                       : darkMode ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-100 text-emerald-700"
-                  }`}>
-                    {selectedTarget.type === "channel" ? "Channel" : "User"}
-                  </span>
-                  <span className={darkMode ? "text-white" : "text-gray-900"}>{selectedTarget.name}</span>
-                </div>
-                <button
-                  onClick={clearSelection}
-                  className={`p-1 rounded-lg transition-colors ${
-                    darkMode ? "hover:bg-slate-600 text-slate-400" : "hover:bg-gray-200 text-gray-500"
                   }`}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setShowSuggestions(true);
-                  }}
-                  onFocus={() => setShowSuggestions(true)}
-                  placeholder="Search for a channel or user..."
-                  className={`w-full px-4 py-2 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent ${
-                    darkMode
-                      ? "bg-slate-700 border-slate-600 text-white placeholder-slate-500"
-                      : "bg-white border border-gray-300 text-gray-900"
-                  }`}
-                />
-                {showSuggestions && (searchQuery.length > 0 || isLoadingSuggestions) && (
-                  <div className={`absolute z-10 w-full mt-1 rounded-xl shadow-lg border overflow-hidden ${
-                    darkMode ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"
-                  }`}>
-                    {isLoadingSuggestions ? (
-                      <div className={`px-4 py-3 text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
-                        Searching...
-                      </div>
-                    ) : suggestions.length > 0 ? (
-                      <ul className="max-h-60 overflow-y-auto">
-                        {suggestions.map((item) => (
-                          <li key={item.id}>
-                            <button
-                              onClick={() => handleSelectTarget(item)}
-                              className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${
-                                darkMode ? "hover:bg-slate-600" : "hover:bg-gray-50"
-                              }`}
-                            >
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                                item.type === "channel"
-                                  ? darkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"
-                                  : darkMode ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-100 text-emerald-700"
-                              }`}>
-                                {item.type === "channel" ? "#" : "@"}
-                              </span>
-                              <span className={darkMode ? "text-white" : "text-gray-900"}>{item.name}</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className={`px-4 py-3 text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
-                        No results found
-                      </div>
-                    )}
+                  <span className="text-sm">{target.name}</span>
+                  <button
+                    onClick={() => handleRemoveTarget(target.id)}
+                    className="p-0.5 rounded hover:bg-black/10"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Search input */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              placeholder={selectedTargets.length > 0 ? "Add more recipients..." : "Search for channels or users..."}
+              className={`w-full px-4 py-2 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent ${
+                darkMode
+                  ? "bg-slate-700 border-slate-600 text-white placeholder-slate-500"
+                  : "bg-white border border-gray-300 text-gray-900"
+              }`}
+            />
+            {showSuggestions && (searchQuery.length > 0 || isLoadingSuggestions) && (
+              <div className={`absolute z-10 w-full mt-1 rounded-xl shadow-lg border overflow-hidden ${
+                darkMode ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"
+              }`}>
+                {isLoadingSuggestions ? (
+                  <div className={`px-4 py-3 text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                    Searching...
+                  </div>
+                ) : suggestions.length > 0 ? (
+                  <ul className="max-h-60 overflow-y-auto">
+                    {suggestions.map((item) => (
+                      <li key={item.id}>
+                        <button
+                          onClick={() => handleSelectTarget(item)}
+                          className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${
+                            darkMode ? "hover:bg-slate-600" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            item.type === "channel"
+                              ? darkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"
+                              : darkMode ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-100 text-emerald-700"
+                          }`}>
+                            {item.type === "channel" ? "#" : "@"}
+                          </span>
+                          <span className={darkMode ? "text-white" : "text-gray-900"}>{item.name}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className={`px-4 py-3 text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                    No results found
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -265,7 +311,7 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
         <div className="flex items-center gap-4">
           <button
             onClick={handleSend}
-            disabled={isSending || !selectedTarget || !message.trim()}
+            disabled={isSending || selectedTargets.length === 0 || !message.trim()}
             className="px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:from-violet-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/25"
           >
             {isSending ? (
@@ -274,7 +320,7 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
                 Sending...
               </span>
             ) : (
-              "Send Message"
+              `Send${selectedTargets.length > 1 ? ` to ${selectedTargets.length}` : ""}`
             )}
           </button>
 
