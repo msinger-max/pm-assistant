@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+
+interface SlackTarget {
+  id: string;
+  name: string;
+  type: "channel" | "user";
+}
 
 interface RecentMessage {
   id: string;
-  channel: string;
+  target: string;
   message: string;
   timestamp: string;
 }
@@ -14,10 +20,16 @@ interface SlackMessengerProps {
 }
 
 export default function SlackMessenger({ darkMode = false }: SlackMessengerProps) {
-  const [channel, setChannel] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTarget, setSelectedTarget] = useState<SlackTarget | null>(null);
+  const [suggestions, setSuggestions] = useState<SlackTarget[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
   const [recentMessages, setRecentMessages] = useState<RecentMessage[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const quickMessages = [
     { label: "Daily Standup Reminder", text: "Hey team! Don't forget we have standup in 15 minutes." },
@@ -25,28 +37,94 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
     { label: "Meeting Follow-up", text: "Thanks for the meeting today! I'll send over the action items shortly." },
   ];
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const searchChannels = async () => {
+      if (searchQuery.length < 1) {
+        setSuggestions([]);
+        return;
+      }
+
+      setIsLoadingSuggestions(true);
+      try {
+        const response = await fetch(`/api/slack/channels?q=${encodeURIComponent(searchQuery)}`);
+        const data = await response.json();
+        setSuggestions(data.results || []);
+      } catch (error) {
+        console.error("Error searching channels:", error);
+        setSuggestions([]);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    };
+
+    const debounce = setTimeout(searchChannels, 300);
+    return () => clearTimeout(debounce);
+  }, [searchQuery]);
+
+  const handleSelectTarget = (target: SlackTarget) => {
+    setSelectedTarget(target);
+    setSearchQuery(target.name);
+    setShowSuggestions(false);
+  };
+
   const handleSend = async () => {
-    if (!channel.trim() || !message.trim()) return;
+    if (!selectedTarget || !message.trim()) return;
 
     setIsSending(true);
+    setSendResult(null);
 
-    // TODO: Connect to Slack API
-    setTimeout(() => {
-      const newMessage: RecentMessage = {
-        id: Date.now().toString(),
-        channel,
-        message,
-        timestamp: new Date().toLocaleTimeString(),
-      };
-      setRecentMessages((prev) => [newMessage, ...prev].slice(0, 5));
-      setMessage("");
+    try {
+      const response = await fetch("/api/slack/send-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channelId: selectedTarget.id,
+          message: message.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        const newMessage: RecentMessage = {
+          id: Date.now().toString(),
+          target: selectedTarget.name,
+          message: message.trim(),
+          timestamp: new Date().toLocaleTimeString(),
+        };
+        setRecentMessages((prev) => [newMessage, ...prev].slice(0, 5));
+        setMessage("");
+        setSendResult({ success: true, message: `Message sent to ${selectedTarget.name}!` });
+      } else {
+        setSendResult({ success: false, message: data.error || "Failed to send message" });
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setSendResult({ success: false, message: "Error connecting to Slack" });
+    } finally {
       setIsSending(false);
-      alert(`Message sent to ${channel}!`);
-    }, 500);
+    }
   };
 
   const handleQuickMessage = (text: string) => {
     setMessage(text);
+  };
+
+  const clearSelection = () => {
+    setSelectedTarget(null);
+    setSearchQuery("");
+    setSuggestions([]);
   };
 
   return (
@@ -78,21 +156,93 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
 
       {/* Message Form */}
       <div className={`rounded-2xl p-6 mb-6 border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
-        <div className="mb-4">
+        <div className="mb-4" ref={searchRef}>
           <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-slate-300" : "text-gray-700"}`}>
             Channel or User
           </label>
-          <input
-            type="text"
-            value={channel}
-            onChange={(e) => setChannel(e.target.value)}
-            placeholder="e.g., #general or @username"
-            className={`w-full px-4 py-2 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent ${
-              darkMode
-                ? "bg-slate-700 border-slate-600 text-white placeholder-slate-500"
-                : "bg-white border border-gray-300 text-gray-900"
-            }`}
-          />
+          <div className="relative">
+            {selectedTarget ? (
+              <div className={`flex items-center justify-between px-4 py-2 rounded-xl border ${
+                darkMode ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200"
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                    selectedTarget.type === "channel"
+                      ? darkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"
+                      : darkMode ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-100 text-emerald-700"
+                  }`}>
+                    {selectedTarget.type === "channel" ? "Channel" : "User"}
+                  </span>
+                  <span className={darkMode ? "text-white" : "text-gray-900"}>{selectedTarget.name}</span>
+                </div>
+                <button
+                  onClick={clearSelection}
+                  className={`p-1 rounded-lg transition-colors ${
+                    darkMode ? "hover:bg-slate-600 text-slate-400" : "hover:bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder="Search for a channel or user..."
+                  className={`w-full px-4 py-2 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent ${
+                    darkMode
+                      ? "bg-slate-700 border-slate-600 text-white placeholder-slate-500"
+                      : "bg-white border border-gray-300 text-gray-900"
+                  }`}
+                />
+                {showSuggestions && (searchQuery.length > 0 || isLoadingSuggestions) && (
+                  <div className={`absolute z-10 w-full mt-1 rounded-xl shadow-lg border overflow-hidden ${
+                    darkMode ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"
+                  }`}>
+                    {isLoadingSuggestions ? (
+                      <div className={`px-4 py-3 text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                        Searching...
+                      </div>
+                    ) : suggestions.length > 0 ? (
+                      <ul className="max-h-60 overflow-y-auto">
+                        {suggestions.map((item) => (
+                          <li key={item.id}>
+                            <button
+                              onClick={() => handleSelectTarget(item)}
+                              className={`w-full px-4 py-2.5 text-left flex items-center gap-3 transition-colors ${
+                                darkMode ? "hover:bg-slate-600" : "hover:bg-gray-50"
+                              }`}
+                            >
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                                item.type === "channel"
+                                  ? darkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"
+                                  : darkMode ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-100 text-emerald-700"
+                              }`}>
+                                {item.type === "channel" ? "#" : "@"}
+                              </span>
+                              <span className={darkMode ? "text-white" : "text-gray-900"}>{item.name}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className={`px-4 py-3 text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                        No results found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <div className="mb-4">
@@ -112,13 +262,43 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
           />
         </div>
 
-        <button
-          onClick={handleSend}
-          disabled={isSending || !channel.trim() || !message.trim()}
-          className="px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:from-violet-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/25"
-        >
-          {isSending ? "Sending..." : "Send Message"}
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleSend}
+            disabled={isSending || !selectedTarget || !message.trim()}
+            className="px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:from-violet-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/25"
+          >
+            {isSending ? (
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Sending...
+              </span>
+            ) : (
+              "Send Message"
+            )}
+          </button>
+
+          {sendResult && (
+            <div
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl ${
+                sendResult.success
+                  ? darkMode ? "bg-emerald-900/30 text-emerald-400" : "bg-emerald-50 text-emerald-700"
+                  : darkMode ? "bg-red-900/30 text-red-400" : "bg-red-50 text-red-700"
+              }`}
+            >
+              {sendResult.success ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+              <span className="text-sm font-medium">{sendResult.message}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Recent Messages */}
@@ -136,7 +316,7 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
                 }`}
               >
                 <div>
-                  <span className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>{msg.channel}</span>
+                  <span className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>{msg.target}</span>
                   <p className={`text-sm truncate max-w-md ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
                     {msg.message}
                   </p>
