@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
   try {
     const results: Array<{ id: string; name: string; type: "channel" | "user" }> = [];
 
-    // Search channels (requires channels:read scope)
+    // Search channels - public and private (requires channels:read and groups:read scopes)
     const channelsResponse = await fetch(
-      "https://slack.com/api/conversations.list?types=public_channel&exclude_archived=true&limit=500",
+      "https://slack.com/api/conversations.list?types=public_channel,private_channel&exclude_archived=true&limit=500",
       {
         headers: {
           Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
