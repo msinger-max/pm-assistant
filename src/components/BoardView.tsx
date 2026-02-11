@@ -36,6 +36,7 @@ export default function BoardView({ project }: BoardViewProps) {
     }
   };
 
+  const todoTickets = tickets.filter((t) => t.status === "To Do");
   const inProgressTickets = tickets.filter((t) => t.status === "In Progress");
   const testingTickets = tickets.filter((t) => t.status === "Testing");
 
@@ -55,13 +56,13 @@ export default function BoardView({ project }: BoardViewProps) {
       href={ticket.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+      className="block bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
     >
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-start justify-between mb-1">
         <span className="text-xs font-medium text-blue-600">{ticket.key}</span>
         <span className="text-xs text-gray-400">{ticket.updated}</span>
       </div>
-      <h4 className="text-sm font-medium text-gray-900 mb-3 line-clamp-2">
+      <h4 className="text-sm font-medium text-gray-900 mb-2 line-clamp-2">
         {ticket.summary}
       </h4>
       <div className="flex items-center justify-between">
@@ -99,7 +100,21 @@ export default function BoardView({ project }: BoardViewProps) {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-3 gap-4">
+        {/* To Do Column */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+            <h3 className="font-semibold text-gray-900">To Do</h3>
+            <span className="text-sm text-gray-500">({todoTickets.length})</span>
+          </div>
+          <div className="space-y-3 bg-gray-50 rounded-lg p-3 min-h-[400px] max-h-[600px] overflow-y-auto">
+            {todoTickets.map((ticket) => (
+              <TicketCard key={ticket.key} ticket={ticket} />
+            ))}
+          </div>
+        </div>
+
         {/* In Progress Column */}
         <div>
           <div className="flex items-center gap-2 mb-4">
@@ -107,7 +122,7 @@ export default function BoardView({ project }: BoardViewProps) {
             <h3 className="font-semibold text-gray-900">In Progress</h3>
             <span className="text-sm text-gray-500">({inProgressTickets.length})</span>
           </div>
-          <div className="space-y-3 bg-gray-50 rounded-lg p-3 min-h-[400px]">
+          <div className="space-y-3 bg-gray-50 rounded-lg p-3 min-h-[400px] max-h-[600px] overflow-y-auto">
             {inProgressTickets.map((ticket) => (
               <TicketCard key={ticket.key} ticket={ticket} />
             ))}
@@ -121,7 +136,7 @@ export default function BoardView({ project }: BoardViewProps) {
             <h3 className="font-semibold text-gray-900">Testing</h3>
             <span className="text-sm text-gray-500">({testingTickets.length})</span>
           </div>
-          <div className="space-y-3 bg-gray-50 rounded-lg p-3 min-h-[400px]">
+          <div className="space-y-3 bg-gray-50 rounded-lg p-3 min-h-[400px] max-h-[600px] overflow-y-auto">
             {testingTickets.map((ticket) => (
               <TicketCard key={ticket.key} ticket={ticket} />
             ))}

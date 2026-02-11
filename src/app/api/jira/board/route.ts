@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jql: `project = ${project} AND status in ("In Progress", "Testing") AND assignee IS NOT EMPTY ORDER BY updated DESC`,
+          jql: `project = ${project} AND status in ("To Do", "In Progress", "Testing") AND assignee IS NOT EMPTY ORDER BY updated DESC`,
           fields: ["summary", "status", "assignee", "updated"],
           maxResults: 50,
         }),
