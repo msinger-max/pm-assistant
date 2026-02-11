@@ -71,37 +71,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Project Selector - Now at top */}
-        <div className="p-4 border-b border-slate-100">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-2">
-            Project
-          </h3>
-          <div className="flex gap-2">
-            {PROJECTS.map((project) => (
-              <button
-                key={project.key}
-                onClick={() => setActiveProject(project)}
-                className={`flex-1 p-2.5 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 ${
-                  activeProject.key === project.key
-                    ? "bg-slate-100 ring-2 ring-violet-500/20"
-                    : "hover:bg-slate-50"
-                }`}
-              >
-                <div
-                  className={`w-7 h-7 bg-gradient-to-br ${project.color} rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-sm`}
-                >
-                  {project.key.substring(0, 2)}
-                </div>
-                <span className={`font-medium text-sm ${
-                  activeProject.key === project.key ? "text-slate-900" : "text-slate-600"
-                }`}>
-                  {project.name}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1">
           {tabs.map((tab) => (
@@ -119,6 +88,42 @@ export default function Home() {
             </button>
           ))}
         </nav>
+
+        {/* Project Selector - Below navigation */}
+        <div className="p-4 border-t border-slate-100">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-2">
+            Project
+          </h3>
+          <div className="space-y-2">
+            {PROJECTS.map((project) => (
+              <button
+                key={project.key}
+                onClick={() => setActiveProject(project)}
+                className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all duration-200 ${
+                  activeProject.key === project.key
+                    ? "bg-slate-100 ring-2 ring-violet-500/20"
+                    : "hover:bg-slate-50"
+                }`}
+              >
+                <div
+                  className={`w-9 h-9 bg-gradient-to-br ${project.color} rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-sm`}
+                >
+                  {project.key.substring(0, 2)}
+                </div>
+                <span className={`font-medium ${
+                  activeProject.key === project.key ? "text-slate-900" : "text-slate-600"
+                }`}>
+                  {project.name}
+                </span>
+                {activeProject.key === project.key && (
+                  <svg className="w-5 h-5 text-violet-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </aside>
 
       {/* Main Content */}
