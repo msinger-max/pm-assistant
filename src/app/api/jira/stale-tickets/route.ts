@@ -37,7 +37,7 @@ export async function GET() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jql: 'project = NTRVSTA AND status in ("In Progress", "Testing") ORDER BY updated ASC',
+          jql: 'project = NTRVSTA AND status in ("In Progress", "Testing") AND assignee IS NOT EMPTY ORDER BY updated ASC',
           fields: ["summary", "status", "assignee", "updated"],
           maxResults: 50,
         }),
