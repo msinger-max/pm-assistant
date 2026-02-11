@@ -3,19 +3,16 @@ import { NextRequest } from "next/server";
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 
-interface SlackChannel {
-  id: string;
-  name: string;
-  is_channel: boolean;
-  is_private: boolean;
-}
-
 interface SlackUser {
   id: string;
   name: string;
   real_name: string;
+  deleted: boolean;
+  is_bot: boolean;
+  is_app_user: boolean;
   profile: {
     display_name: string;
+    real_name: string;
   };
 }
 
@@ -33,36 +30,9 @@ export async function GET(request: NextRequest) {
   try {
     const results: Array<{ id: string; name: string; type: "channel" | "user" }> = [];
 
-    // Search channels
-    const channelsResponse = await fetch(
-      "https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=100",
-      {
-        headers: {
-          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-        },
-      }
-    );
-
-    const channelsData = await channelsResponse.json();
-
-    if (channelsData.ok && channelsData.channels) {
-      const filteredChannels = channelsData.channels
-        .filter((ch: SlackChannel) =>
-          ch.name.toLowerCase().includes(query.toLowerCase())
-        )
-        .slice(0, 10)
-        .map((ch: SlackChannel) => ({
-          id: ch.id,
-          name: `#${ch.name}`,
-          type: "channel" as const,
-        }));
-
-      results.push(...filteredChannels);
-    }
-
-    // Search users
+    // Search users (this works with users:read scope)
     const usersResponse = await fetch(
-      "https://slack.com/api/users.list?limit=100",
+      "https://slack.com/api/users.list?limit=500",
       {
         headers: {
           Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
@@ -74,14 +44,27 @@ export async function GET(request: NextRequest) {
 
     if (usersData.ok && usersData.members) {
       const filteredUsers = usersData.members
-        .filter(
-          (user: SlackUser) =>
-            !user.name.includes("bot") &&
-            (user.real_name?.toLowerCase().includes(query.toLowerCase()) ||
-              user.name?.toLowerCase().includes(query.toLowerCase()) ||
-              user.profile?.display_name?.toLowerCase().includes(query.toLowerCase()))
-        )
-        .slice(0, 10)
+        .filter((user: SlackUser) => {
+          // Exclude bots, deleted users, and app users
+          if (user.deleted || user.is_bot || user.is_app_user) return false;
+          // Exclude slackbot
+          if (user.name === "slackbot") return false;
+
+          const displayName = user.profile?.display_name || "";
+          const realName = user.real_name || user.profile?.real_name || "";
+          const userName = user.name || "";
+
+          // If no query, return all active users
+          if (query === "") return true;
+
+          // Filter by query
+          return (
+            displayName.toLowerCase().includes(query.toLowerCase()) ||
+            realName.toLowerCase().includes(query.toLowerCase()) ||
+            userName.toLowerCase().includes(query.toLowerCase())
+          );
+        })
+        .slice(0, 20)
         .map((user: SlackUser) => ({
           id: user.id,
           name: `@${user.profile?.display_name || user.real_name || user.name}`,
@@ -91,11 +74,16 @@ export async function GET(request: NextRequest) {
       results.push(...filteredUsers);
     }
 
-    return NextResponse.json({ results });
+    // Sort alphabetically
+    results.sort((a, b) => a.name.localeCompare(b.name));
+
+    return NextResponse.json({
+      results,
+    });
   } catch (error) {
-    console.error("Error fetching Slack channels/users:", error);
+    console.error("Error fetching Slack users:", error);
     return NextResponse.json(
-      { error: "Failed to fetch channels" },
+      { error: "Failed to fetch users", details: String(error) },
       { status: 500 }
     );
   }
