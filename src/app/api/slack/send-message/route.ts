@@ -4,7 +4,7 @@ const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 
 export async function POST(request: Request) {
   try {
-    const { channelId, message } = await request.json();
+    const { channelId, message, isUser } = await request.json();
 
     if (!SLACK_BOT_TOKEN) {
       return NextResponse.json(
@@ -20,6 +20,36 @@ export async function POST(request: Request) {
       );
     }
 
+    let targetChannel = channelId;
+
+    // If sending to a user, we need to open a DM conversation first
+    if (isUser) {
+      const openResponse = await fetch("https://slack.com/api/conversations.open", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        },
+        body: JSON.stringify({
+          users: channelId, // User ID
+        }),
+      });
+
+      const openData = await openResponse.json();
+
+      if (!openData.ok) {
+        console.error("Slack conversations.open error:", openData.error);
+        return NextResponse.json(
+          { error: openData.error || "Failed to open DM conversation" },
+          { status: 400 }
+        );
+      }
+
+      // Use the DM channel ID
+      targetChannel = openData.channel.id;
+    }
+
+    // Send the message
     const response = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
@@ -27,7 +57,7 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
       },
       body: JSON.stringify({
-        channel: channelId,
+        channel: targetChannel,
         text: message,
       }),
     });

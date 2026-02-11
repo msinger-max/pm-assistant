@@ -104,6 +104,7 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
           body: JSON.stringify({
             channelId: target.id,
             message: message.trim(),
+            isUser: target.type === "user",
           }),
         });
 
