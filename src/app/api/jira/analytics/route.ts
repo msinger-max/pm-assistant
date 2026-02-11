@@ -170,12 +170,19 @@ export async function GET(request: NextRequest) {
       completedByAssignee[assignee] = (completedByAssignee[assignee] || 0) + 1;
     });
 
-    // Tickets by label (from created tickets)
+    // Tickets by label (from created tickets) - normalize case
     const ticketsByLabel: Record<string, number> = {};
+    const labelCaseMap: Record<string, string> = {}; // maps lowercase to first seen case
     createdIssues.forEach((issue) => {
       const labels = issue.fields.labels || [];
       labels.forEach((label) => {
-        ticketsByLabel[label] = (ticketsByLabel[label] || 0) + 1;
+        const lowerLabel = label.toLowerCase();
+        // Keep the first case we see for display
+        if (!labelCaseMap[lowerLabel]) {
+          labelCaseMap[lowerLabel] = label;
+        }
+        const displayLabel = labelCaseMap[lowerLabel];
+        ticketsByLabel[displayLabel] = (ticketsByLabel[displayLabel] || 0) + 1;
       });
     });
 
