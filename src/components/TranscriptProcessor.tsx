@@ -10,7 +10,11 @@ interface ActionItem {
   selected: boolean;
 }
 
-export default function TranscriptProcessor() {
+interface TranscriptProcessorProps {
+  darkMode?: boolean;
+}
+
+export default function TranscriptProcessor({ darkMode = false }: TranscriptProcessorProps) {
   const [transcript, setTranscript] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
@@ -71,16 +75,16 @@ export default function TranscriptProcessor() {
   };
 
   const priorityColors = {
-    high: "bg-red-100 text-red-700",
-    medium: "bg-yellow-100 text-yellow-700",
-    low: "bg-green-100 text-green-700",
+    high: darkMode ? "bg-red-900/30 text-red-400" : "bg-red-100 text-red-700",
+    medium: darkMode ? "bg-yellow-900/30 text-yellow-400" : "bg-yellow-100 text-yellow-700",
+    low: darkMode ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700",
   };
 
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Process Transcript</h2>
-        <p className="text-gray-500">
+        <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Process Transcript</h2>
+        <p className={darkMode ? "text-slate-400" : "text-gray-500"}>
           Paste your meeting transcript and extract action items
         </p>
       </div>
@@ -91,12 +95,16 @@ export default function TranscriptProcessor() {
           value={transcript}
           onChange={(e) => setTranscript(e.target.value)}
           placeholder="Paste your Granola transcript here..."
-          className="w-full h-48 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900"
+          className={`w-full h-48 p-4 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none transition-all ${
+            darkMode
+              ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500"
+              : "bg-white border border-gray-300 text-gray-900"
+          }`}
         />
         <button
           onClick={handleProcess}
           disabled={isProcessing || !transcript.trim()}
-          className="mt-3 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="mt-3 px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:from-violet-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/25"
         >
           {isProcessing ? "Processing..." : "Extract Action Items"}
         </button>
@@ -105,8 +113,8 @@ export default function TranscriptProcessor() {
 
       {/* Action Items */}
       {actionItems.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className={`rounded-2xl p-6 border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
+          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
             Action Items Found
           </h3>
 
@@ -114,24 +122,28 @@ export default function TranscriptProcessor() {
             {actionItems.map((item) => (
               <div
                 key={item.id}
-                className={`flex items-center gap-4 p-4 rounded-lg border ${
-                  item.selected ? "border-blue-200 bg-blue-50" : "border-gray-200"
+                className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                  item.selected
+                    ? darkMode
+                      ? "border-violet-500/50 bg-violet-900/20"
+                      : "border-blue-200 bg-blue-50"
+                    : darkMode
+                      ? "border-slate-700 bg-slate-800/50"
+                      : "border-gray-200"
                 }`}
               >
                 <input
                   type="checkbox"
                   checked={item.selected}
                   onChange={() => toggleItem(item.id)}
-                  className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
                 />
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{item.task}</p>
-                  <p className="text-sm text-gray-500">Assignee: {item.assignee}</p>
+                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>{item.task}</p>
+                  <p className={`text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>Assignee: {item.assignee}</p>
                 </div>
                 <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    priorityColors[item.priority]
-                  }`}
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${priorityColors[item.priority]}`}
                 >
                   {item.priority}
                 </span>
@@ -143,7 +155,7 @@ export default function TranscriptProcessor() {
             <button
               onClick={handleCreateTickets}
               disabled={isCreatingTickets || !actionItems.some((i) => i.selected)}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl hover:from-emerald-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/25"
             >
               {isCreatingTickets
                 ? "Creating..."
@@ -151,7 +163,11 @@ export default function TranscriptProcessor() {
             </button>
             <button
               onClick={() => setActionItems([])}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className={`px-6 py-2.5 rounded-xl transition-colors border ${
+                darkMode
+                  ? "border-slate-600 text-slate-300 hover:bg-slate-700"
+                  : "border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
             >
               Clear
             </button>
@@ -159,7 +175,7 @@ export default function TranscriptProcessor() {
         </div>
       )}
       {!isProcessing && !error && actionItems.length === 0 && (
-        <p className="text-sm text-gray-500">No action items yet.</p>
+        <p className={`text-sm ${darkMode ? "text-slate-500" : "text-gray-500"}`}>No action items yet.</p>
       )}
     </div>
   );

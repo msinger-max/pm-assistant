@@ -13,9 +13,10 @@ interface Ticket {
 
 interface StaleTicketsProps {
   project: string;
+  darkMode?: boolean;
 }
 
-export default function StaleTickets({ project }: StaleTicketsProps) {
+export default function StaleTickets({ project, darkMode = false }: StaleTicketsProps) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
@@ -133,7 +134,7 @@ export default function StaleTickets({ project }: StaleTicketsProps) {
       <div className="flex items-center justify-center py-24">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin"></div>
-          <p className="text-slate-500 text-sm">Loading stale tickets...</p>
+          <p className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Loading stale tickets...</p>
         </div>
       </div>
     );
@@ -144,12 +145,16 @@ export default function StaleTickets({ project }: StaleTicketsProps) {
       {/* Header */}
       <div className="mb-8 flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-1">Stale Tickets</h2>
-          <p className="text-slate-500">{project} • Tickets with no activity for 4+ days</p>
+          <h2 className={`text-2xl font-bold mb-1 ${darkMode ? "text-white" : "text-slate-800"}`}>Stale Tickets</h2>
+          <p className={darkMode ? "text-slate-400" : "text-slate-500"}>{project} • Tickets with no activity for 4+ days</p>
         </div>
         <button
           onClick={loadStaleTickets}
-          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 shadow-sm"
+          className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 shadow-sm border ${
+            darkMode
+              ? "text-slate-300 bg-slate-800 border-slate-700 hover:bg-slate-700 hover:border-slate-600"
+              : "text-slate-600 bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+          }`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -159,25 +164,25 @@ export default function StaleTickets({ project }: StaleTicketsProps) {
       </div>
 
       {tickets.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm">
-          <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <div className={`text-center py-16 rounded-2xl border shadow-sm ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${darkMode ? "bg-emerald-900/30" : "bg-emerald-100"}`}>
             <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-slate-800 mb-1">All caught up!</h3>
-          <p className="text-slate-500">No stale tickets. All board tickets have recent activity.</p>
+          <h3 className={`text-lg font-semibold mb-1 ${darkMode ? "text-white" : "text-slate-800"}`}>All caught up!</h3>
+          <p className={darkMode ? "text-slate-400" : "text-slate-500"}>No stale tickets. All board tickets have recent activity.</p>
         </div>
       ) : (
         <>
           {/* Action Bar */}
-          <div className="mb-4 flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-slate-100 shadow-sm">
+          <div className={`mb-4 flex items-center justify-between rounded-xl px-4 py-3 border shadow-sm ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-2 text-sm">
-                <span className="w-6 h-6 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-xs font-bold">
+                <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold ${darkMode ? "bg-red-900/30 text-red-400" : "bg-red-100 text-red-600"}`}>
                   {tickets.length}
                 </span>
-                <span className="text-slate-600">tickets need attention</span>
+                <span className={darkMode ? "text-slate-300" : "text-slate-600"}>tickets need attention</span>
               </span>
             </div>
             <button
@@ -199,17 +204,23 @@ export default function StaleTickets({ project }: StaleTicketsProps) {
                 <div
                   key={ticket.key}
                   onClick={() => toggleTicket(ticket.key)}
-                  className={`bg-white rounded-xl p-4 transition-all duration-200 cursor-pointer border ${
+                  className={`rounded-xl p-4 transition-all duration-200 cursor-pointer border ${
                     isSelected
-                      ? "border-violet-300 ring-2 ring-violet-100 shadow-md"
-                      : "border-slate-100 hover:border-slate-200 shadow-sm hover:shadow"
+                      ? darkMode
+                        ? "bg-slate-800 border-violet-500/50 ring-2 ring-violet-500/20 shadow-md"
+                        : "bg-white border-violet-300 ring-2 ring-violet-100 shadow-md"
+                      : darkMode
+                        ? "bg-slate-800 border-slate-700 hover:border-slate-600 shadow-sm hover:shadow"
+                        : "bg-white border-slate-100 hover:border-slate-200 shadow-sm hover:shadow"
                   }`}
                 >
                   <div className="flex items-start gap-4">
                     <div className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                       isSelected
                         ? "bg-violet-600 border-violet-600"
-                        : "border-slate-300 hover:border-violet-400"
+                        : darkMode
+                          ? "border-slate-600 hover:border-violet-400"
+                          : "border-slate-300 hover:border-violet-400"
                     }`}>
                       {isSelected && (
                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -225,7 +236,7 @@ export default function StaleTickets({ project }: StaleTicketsProps) {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-sm font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md"
+                          className={`text-sm font-semibold px-2 py-0.5 rounded-md ${darkMode ? "text-violet-400 bg-violet-900/40 hover:text-violet-300" : "text-violet-600 hover:text-violet-700 bg-violet-50"}`}
                         >
                           {ticket.key}
                         </a>
@@ -234,7 +245,7 @@ export default function StaleTickets({ project }: StaleTicketsProps) {
                         </span>
                       </div>
 
-                      <p className="text-slate-700 font-medium mb-3">{ticket.summary}</p>
+                      <p className={`font-medium mb-3 ${darkMode ? "text-slate-200" : "text-slate-700"}`}>{ticket.summary}</p>
 
                       <div className="flex items-center gap-3">
                         <div className={`flex items-center gap-2 px-2.5 py-1 rounded-lg ${assigneeStyle.bg}`}>

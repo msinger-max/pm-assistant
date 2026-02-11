@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TranscriptProcessor from "@/components/TranscriptProcessor";
 import StaleTickets from "@/components/StaleTickets";
 import SlackMessenger from "@/components/SlackMessenger";
@@ -18,6 +18,27 @@ const PROJECTS = [
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("board");
   const [activeProject, setActiveProject] = useState(PROJECTS[0]);
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    // Check for saved preference or system preference
+    const saved = localStorage.getItem("darkMode");
+    if (saved !== null) {
+      setDarkMode(saved === "true");
+    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      setDarkMode(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Apply dark mode class to html element
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    localStorage.setItem("darkMode", String(darkMode));
+  }, [darkMode]);
 
   const tabs = [
     { id: "board" as Tab, label: "Board", icon: (
@@ -53,11 +74,11 @@ export default function Home() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className={`flex min-h-screen ${darkMode ? "bg-slate-900" : "bg-slate-50"}`}>
       {/* Sidebar */}
-      <aside className="w-72 bg-white border-r border-slate-200/60 flex flex-col">
+      <aside className={`w-72 ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200/60"} border-r flex flex-col`}>
         {/* Logo */}
-        <div className="p-6 border-b border-slate-100">
+        <div className={`p-6 border-b ${darkMode ? "border-slate-700" : "border-slate-100"}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/25">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,9 +86,29 @@ export default function Home() {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-800">PM Assistant</h1>
-              <p className="text-xs text-slate-400">Productivity hub</p>
+              <h1 className={`text-lg font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>PM Assistant</h1>
+              <p className={`text-xs ${darkMode ? "text-slate-400" : "text-slate-400"}`}>Productivity hub</p>
             </div>
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`ml-auto p-2 rounded-lg transition-all duration-200 ${
+                darkMode
+                  ? "bg-slate-700 text-yellow-400 hover:bg-slate-600"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {darkMode ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
 
@@ -80,7 +121,9 @@ export default function Home() {
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 ${
                 activeTab === tab.id
                   ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/25"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  : darkMode
+                    ? "text-slate-300 hover:bg-slate-700 hover:text-white"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               {tab.icon}
@@ -90,8 +133,8 @@ export default function Home() {
         </nav>
 
         {/* Project Selector - Below navigation */}
-        <div className="p-4 border-t border-slate-100">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-2">
+        <div className={`p-4 border-t ${darkMode ? "border-slate-700" : "border-slate-100"}`}>
+          <h3 className={`text-xs font-semibold uppercase tracking-wider mb-3 px-2 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
             Project
           </h3>
           <div className="space-y-2">
@@ -101,8 +144,12 @@ export default function Home() {
                 onClick={() => setActiveProject(project)}
                 className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all duration-200 ${
                   activeProject.key === project.key
-                    ? "bg-slate-100 ring-2 ring-violet-500/20"
-                    : "hover:bg-slate-50"
+                    ? darkMode
+                      ? "bg-slate-700 ring-2 ring-violet-500/30"
+                      : "bg-slate-100 ring-2 ring-violet-500/20"
+                    : darkMode
+                      ? "hover:bg-slate-700"
+                      : "hover:bg-slate-50"
                 }`}
               >
                 <div
@@ -111,7 +158,9 @@ export default function Home() {
                   {project.key.substring(0, 2)}
                 </div>
                 <span className={`font-medium ${
-                  activeProject.key === project.key ? "text-slate-900" : "text-slate-600"
+                  activeProject.key === project.key
+                    ? darkMode ? "text-white" : "text-slate-900"
+                    : darkMode ? "text-slate-300" : "text-slate-600"
                 }`}>
                   {project.name}
                 </span>
@@ -129,12 +178,12 @@ export default function Home() {
       {/* Main Content */}
       <main className="flex-1 p-8 overflow-auto">
         <div className="max-w-6xl mx-auto">
-          {activeTab === "board" && <BoardView project={activeProject.key} />}
-          {activeTab === "analytics" && <Analytics project={activeProject.key} />}
-          {activeTab === "transcript" && <TranscriptProcessor />}
-          {activeTab === "tickets" && <StaleTickets project={activeProject.key} />}
-          {activeTab === "slack" && <SlackMessenger />}
-          {activeTab === "meetings" && <TodaysMeetings />}
+          {activeTab === "board" && <BoardView project={activeProject.key} darkMode={darkMode} />}
+          {activeTab === "analytics" && <Analytics project={activeProject.key} darkMode={darkMode} />}
+          {activeTab === "transcript" && <TranscriptProcessor darkMode={darkMode} />}
+          {activeTab === "tickets" && <StaleTickets project={activeProject.key} darkMode={darkMode} />}
+          {activeTab === "slack" && <SlackMessenger darkMode={darkMode} />}
+          {activeTab === "meetings" && <TodaysMeetings darkMode={darkMode} />}
         </div>
       </main>
     </div>

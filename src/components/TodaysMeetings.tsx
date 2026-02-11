@@ -11,7 +11,11 @@ interface Meeting {
   meetingLink?: string;
 }
 
-export default function TodaysMeetings() {
+interface TodaysMeetingsProps {
+  darkMode?: boolean;
+}
+
+export default function TodaysMeetings({ darkMode = false }: TodaysMeetingsProps) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -74,8 +78,8 @@ export default function TodaysMeetings() {
     <div>
       <div className="mb-6 flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Today's Meetings</h2>
-          <p className="text-gray-500">
+          <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Today&apos;s Meetings</h2>
+          <p className={darkMode ? "text-slate-400" : "text-gray-500"}>
             {new Date().toLocaleDateString("en-US", {
               weekday: "long",
               year: "numeric",
@@ -87,7 +91,7 @@ export default function TodaysMeetings() {
         <button
           onClick={handleSendAllReminders}
           disabled={meetings.length === 0}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="px-4 py-2.5 text-sm bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:from-violet-600 hover:to-purple-700 disabled:opacity-50 transition-all shadow-lg shadow-violet-500/25"
         >
           Send All Reminders
         </button>
@@ -95,36 +99,38 @@ export default function TodaysMeetings() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
         </div>
       ) : meetings.length === 0 ? (
-        <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
-          <p className="text-gray-500">No meetings scheduled for today!</p>
+        <div className={`text-center py-12 rounded-2xl border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
+          <p className={darkMode ? "text-slate-400" : "text-gray-500"}>No meetings scheduled for today!</p>
         </div>
       ) : (
         <div className="space-y-4">
           {meetings.map((meeting) => (
             <div
               key={meeting.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
+              className={`rounded-2xl p-4 border transition-shadow hover:shadow-sm ${
+                darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"
+              }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex gap-4">
                   <div className="text-center min-w-[80px]">
-                    <div className="text-lg font-semibold text-gray-900">
+                    <div className={`text-lg font-semibold ${darkMode ? "text-white" : "text-gray-900"}`}>
                       {meeting.time}
                     </div>
-                    <div className="text-sm text-gray-500">{meeting.duration}</div>
+                    <div className={`text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>{meeting.duration}</div>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">{meeting.title}</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className={`font-semibold ${darkMode ? "text-white" : "text-gray-900"}`}>{meeting.title}</h3>
+                    <p className={`text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
                       {meeting.attendees.join(", ")}
                     </p>
                     {meeting.meetingLink && (
                       <a
                         href={meeting.meetingLink}
-                        className="text-sm text-blue-600 hover:underline mt-1 inline-block"
+                        className="text-sm text-violet-600 hover:text-violet-700 hover:underline mt-1 inline-block"
                       >
                         Join Meeting
                       </a>
@@ -133,7 +139,11 @@ export default function TodaysMeetings() {
                 </div>
                 <button
                   onClick={() => handleSendReminder(meeting)}
-                  className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className={`px-3 py-1.5 text-sm rounded-xl transition-colors border ${
+                    darkMode
+                      ? "border-slate-600 text-slate-300 hover:bg-slate-700"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
                   Send Reminder
                 </button>
