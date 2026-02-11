@@ -20,8 +20,9 @@ export async function GET() {
   const baseUrl = process.env.JIRA_BASE_URL;
 
   if (!email || !apiToken || !baseUrl) {
+    console.error("Missing Jira config:", { email: !!email, apiToken: !!apiToken, baseUrl: !!baseUrl });
     return NextResponse.json(
-      { error: "Jira credentials not configured" },
+      { error: "Jira credentials not configured", debug: { email: !!email, apiToken: !!apiToken, baseUrl: !!baseUrl } },
       { status: 500 }
     );
   }
@@ -47,14 +48,23 @@ export async function GET() {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Jira API error:", errorText);
+      console.error("Jira API error:", response.status, errorText);
       return NextResponse.json(
-        { error: `Jira API error: ${response.status}` },
+        { error: `Jira API error: ${response.status}`, details: errorText },
         { status: response.status }
       );
     }
 
     const data = await response.json();
+
+    if (!data.issues || !Array.isArray(data.issues)) {
+      console.error("Unexpected Jira response:", JSON.stringify(data).slice(0, 500));
+      return NextResponse.json({
+        tickets: [],
+        error: "Unexpected response format",
+        debug: JSON.stringify(data).slice(0, 200)
+      });
+    }
 
     const tickets = data.issues.map((issue: JiraIssue) => ({
       key: issue.key,
@@ -69,7 +79,7 @@ export async function GET() {
   } catch (error) {
     console.error("Error fetching Jira tickets:", error);
     return NextResponse.json(
-      { error: "Failed to fetch Jira tickets" },
+      { error: "Failed to fetch Jira tickets", details: String(error) },
       { status: 500 }
     );
   }
