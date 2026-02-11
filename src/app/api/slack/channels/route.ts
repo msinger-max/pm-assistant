@@ -3,6 +3,13 @@ import { NextRequest } from "next/server";
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 
+interface SlackChannel {
+  id: string;
+  name: string;
+  is_channel: boolean;
+  is_private: boolean;
+}
+
 interface SlackUser {
   id: string;
   name: string;
@@ -30,7 +37,34 @@ export async function GET(request: NextRequest) {
   try {
     const results: Array<{ id: string; name: string; type: "channel" | "user" }> = [];
 
-    // Search users (this works with users:read scope)
+    // Search channels (requires channels:read scope)
+    const channelsResponse = await fetch(
+      "https://slack.com/api/conversations.list?types=public_channel&exclude_archived=true&limit=500",
+      {
+        headers: {
+          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        },
+      }
+    );
+
+    const channelsData = await channelsResponse.json();
+
+    if (channelsData.ok && channelsData.channels) {
+      const filteredChannels = channelsData.channels
+        .filter((ch: SlackChannel) =>
+          query === "" || ch.name.toLowerCase().includes(query.toLowerCase())
+        )
+        .slice(0, 15)
+        .map((ch: SlackChannel) => ({
+          id: ch.id,
+          name: `#${ch.name}`,
+          type: "channel" as const,
+        }));
+
+      results.push(...filteredChannels);
+    }
+
+    // Search users (requires users:read scope)
     const usersResponse = await fetch(
       "https://slack.com/api/users.list?limit=500",
       {
@@ -64,7 +98,7 @@ export async function GET(request: NextRequest) {
             userName.toLowerCase().includes(query.toLowerCase())
           );
         })
-        .slice(0, 20)
+        .slice(0, 15)
         .map((user: SlackUser) => ({
           id: user.id,
           name: `@${user.profile?.display_name || user.real_name || user.name}`,
@@ -74,16 +108,19 @@ export async function GET(request: NextRequest) {
       results.push(...filteredUsers);
     }
 
-    // Sort alphabetically
-    results.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort: channels first, then users, alphabetically within each group
+    results.sort((a, b) => {
+      if (a.type === b.type) return a.name.localeCompare(b.name);
+      return a.type === "channel" ? -1 : 1;
+    });
 
     return NextResponse.json({
       results,
     });
   } catch (error) {
-    console.error("Error fetching Slack users:", error);
+    console.error("Error fetching Slack channels/users:", error);
     return NextResponse.json(
-      { error: "Failed to fetch users", details: String(error) },
+      { error: "Failed to fetch channels/users", details: String(error) },
       { status: 500 }
     );
   }

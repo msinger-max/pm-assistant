@@ -158,7 +158,7 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
       <div className={`rounded-2xl p-6 mb-6 border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
         <div className="mb-4" ref={searchRef}>
           <label className={`block text-sm font-medium mb-1 ${darkMode ? "text-slate-300" : "text-gray-700"}`}>
-            User
+            Channel or User
           </label>
           <div className="relative">
             {selectedTarget ? (
@@ -196,7 +196,7 @@ export default function SlackMessenger({ darkMode = false }: SlackMessengerProps
                     setShowSuggestions(true);
                   }}
                   onFocus={() => setShowSuggestions(true)}
-                  placeholder="Search for a user..."
+                  placeholder="Search for a channel or user..."
                   className={`w-full px-4 py-2 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent ${
                     darkMode
                       ? "bg-slate-700 border-slate-600 text-white placeholder-slate-500"
