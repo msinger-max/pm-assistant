@@ -11,20 +11,24 @@ interface Ticket {
   url: string;
 }
 
-export default function BoardView() {
+interface BoardViewProps {
+  project: string;
+}
+
+export default function BoardView({ project }: BoardViewProps) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadBoardTickets();
-  }, []);
+  }, [project]);
 
   const loadBoardTickets = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/jira/board");
+      const response = await fetch(`/api/jira/board?project=${project}`);
       const data = await response.json();
-      setTickets(data.tickets);
+      setTickets(data.tickets || []);
     } catch (error) {
       console.error("Failed to load tickets:", error);
     } finally {
@@ -85,7 +89,7 @@ export default function BoardView() {
       <div className="mb-6 flex justify-between items-start">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Board View</h2>
-          <p className="text-gray-500">NTRVSTA - Active tickets</p>
+          <p className="text-gray-500">{project} - Active tickets</p>
         </div>
         <button
           onClick={loadBoardTickets}

@@ -11,21 +11,26 @@ interface Ticket {
   url: string;
 }
 
-export default function StaleTickets() {
+interface StaleTicketsProps {
+  project: string;
+}
+
+export default function StaleTickets({ project }: StaleTicketsProps) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadStaleTickets();
-  }, []);
+  }, [project]);
 
   const loadStaleTickets = async () => {
     setIsLoading(true);
+    setSelectedTickets(new Set());
     try {
-      const response = await fetch("/api/jira/stale-tickets");
+      const response = await fetch(`/api/jira/stale-tickets?project=${project}`);
       const data = await response.json();
-      setTickets(data.tickets);
+      setTickets(data.tickets || []);
     } catch (error) {
       console.error("Failed to load tickets:", error);
     } finally {
@@ -129,7 +134,7 @@ export default function StaleTickets() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Stale Tickets</h2>
           <p className="text-gray-500">
-            Board tickets (In Progress / Testing) with no activity for 4+ days
+            {project} - Board tickets with no activity for 4+ days
           </p>
         </div>
         <button

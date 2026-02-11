@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 interface JiraIssue {
   key: string;
@@ -14,7 +15,10 @@ interface JiraIssue {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const project = searchParams.get("project") || "NTRVSTA";
+
   const email = process.env.JIRA_EMAIL;
   const apiToken = process.env.JIRA_API_TOKEN;
   const baseUrl = process.env.JIRA_BASE_URL;
@@ -38,7 +42,7 @@ export async function GET() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          jql: 'project = NTRVSTA AND status in ("In Progress", "Testing") AND assignee IS NOT EMPTY ORDER BY updated DESC',
+          jql: `project = ${project} AND status in ("In Progress", "Testing") AND assignee IS NOT EMPTY ORDER BY updated DESC`,
           fields: ["summary", "status", "assignee", "updated"],
           maxResults: 50,
         }),
