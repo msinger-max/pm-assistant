@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+const SENDER_USER_ID = process.env.SLACK_SENDER_USER_ID || "U09R810F272"; // Matias Singer
 
 export async function POST(request: Request) {
   try {
@@ -22,8 +23,9 @@ export async function POST(request: Request) {
 
     let targetChannel = channelId;
 
-    // If sending to a user, we need to open a DM conversation first
+    // If sending to a user, open a group conversation (MPIM) that includes the sender
     if (isUser) {
+      // Create a group DM with the sender and the recipient
       const openResponse = await fetch("https://slack.com/api/conversations.open", {
         method: "POST",
         headers: {
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
         },
         body: JSON.stringify({
-          users: channelId, // User ID
+          users: `${SENDER_USER_ID},${channelId}`, // Include sender + recipient
         }),
       });
 
@@ -40,12 +42,12 @@ export async function POST(request: Request) {
       if (!openData.ok) {
         console.error("Slack conversations.open error:", openData.error);
         return NextResponse.json(
-          { error: openData.error || "Failed to open DM conversation" },
+          { error: openData.error || "Failed to open group conversation" },
           { status: 400 }
         );
       }
 
-      // Use the DM channel ID
+      // Use the group DM channel ID
       targetChannel = openData.channel.id;
     }
 
