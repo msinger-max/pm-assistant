@@ -1,6 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+
+interface WeeklyDataPoint {
+  week: string;
+  created: number;
+  completed: number;
+}
 
 interface AnalyticsData {
   ticketsCreated: number;
@@ -11,6 +27,7 @@ interface AnalyticsData {
   createdByAssignee: Record<string, number>;
   completedByAssignee: Record<string, number>;
   ticketsByLabel: Record<string, number>;
+  weeklyData: WeeklyDataPoint[];
 }
 
 interface AnalyticsProps {
@@ -226,7 +243,102 @@ export default function Analytics({ project, darkMode = false }: AnalyticsProps)
         </div>
       </div>
 
-      {/* Charts Section */}
+      {/* Line Charts */}
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        {/* Tickets Created by Week */}
+        <div className={`rounded-2xl p-6 shadow-sm border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
+          <h3 className={`font-semibold mb-4 ${darkMode ? "text-slate-200" : "text-slate-700"}`}>
+            Tickets Created by Week
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                <XAxis
+                  dataKey="week"
+                  tick={{ fill: darkMode ? "#94a3b8" : "#64748b", fontSize: 12 }}
+                  axisLine={{ stroke: darkMode ? "#475569" : "#cbd5e1" }}
+                />
+                <YAxis
+                  tick={{ fill: darkMode ? "#94a3b8" : "#64748b", fontSize: 12 }}
+                  axisLine={{ stroke: darkMode ? "#475569" : "#cbd5e1" }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: darkMode ? "#1e293b" : "#ffffff",
+                    border: darkMode ? "1px solid #334155" : "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    color: darkMode ? "#f1f5f9" : "#1e293b",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="created"
+                  stroke="#818cf8"
+                  strokeWidth={2}
+                  dot={{ fill: "#818cf8", strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                  name="Created"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Created vs Completed */}
+        <div className={`rounded-2xl p-6 shadow-sm border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
+          <h3 className={`font-semibold mb-4 ${darkMode ? "text-slate-200" : "text-slate-700"}`}>
+            Created vs Completed
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                <XAxis
+                  dataKey="week"
+                  tick={{ fill: darkMode ? "#94a3b8" : "#64748b", fontSize: 12 }}
+                  axisLine={{ stroke: darkMode ? "#475569" : "#cbd5e1" }}
+                />
+                <YAxis
+                  tick={{ fill: darkMode ? "#94a3b8" : "#64748b", fontSize: 12 }}
+                  axisLine={{ stroke: darkMode ? "#475569" : "#cbd5e1" }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: darkMode ? "#1e293b" : "#ffffff",
+                    border: darkMode ? "1px solid #334155" : "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    color: darkMode ? "#f1f5f9" : "#1e293b",
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="created"
+                  stroke="#818cf8"
+                  strokeWidth={2}
+                  dot={{ fill: "#818cf8", strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                  name="Created"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="completed"
+                  stroke="#34d399"
+                  strokeWidth={2}
+                  dot={{ fill: "#34d399", strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                  name="Completed"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Bar Charts Section */}
       <div className="grid grid-cols-2 gap-6 mb-6">
         {/* Created by Assignee */}
         <div className={`rounded-2xl p-6 shadow-sm border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>

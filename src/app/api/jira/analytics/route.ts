@@ -181,6 +181,47 @@ export async function GET(request: NextRequest) {
       });
     });
 
+    // Generate weekly data for charts
+    const weeklyData: Array<{ week: string; created: number; completed: number }> = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Get the Monday of the start week
+    const startMonday = new Date(start);
+    startMonday.setDate(start.getDate() - start.getDay() + (start.getDay() === 0 ? -6 : 1));
+
+    // Iterate through weeks
+    const currentWeek = new Date(startMonday);
+    while (currentWeek <= end) {
+      const weekEnd = new Date(currentWeek);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      // Format week label (e.g., "Jan 6")
+      const weekLabel = currentWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+      // Count created tickets in this week
+      const createdInWeek = createdIssues.filter((issue) => {
+        const created = new Date(issue.fields.created);
+        return created >= currentWeek && created <= weekEnd;
+      }).length;
+
+      // Count completed tickets in this week
+      const completedInWeek = completedIssues.filter((issue) => {
+        if (!issue.fields.resolutiondate) return false;
+        const resolved = new Date(issue.fields.resolutiondate);
+        return resolved >= currentWeek && resolved <= weekEnd;
+      }).length;
+
+      weeklyData.push({
+        week: weekLabel,
+        created: createdInWeek,
+        completed: completedInWeek,
+      });
+
+      // Move to next week
+      currentWeek.setDate(currentWeek.getDate() + 7);
+    }
+
     return NextResponse.json({
       ticketsCreated,
       ticketsCompleted,
@@ -190,6 +231,7 @@ export async function GET(request: NextRequest) {
       createdByAssignee,
       completedByAssignee,
       ticketsByLabel,
+      weeklyData,
     });
   } catch (error) {
     console.error("Error fetching analytics:", error);
