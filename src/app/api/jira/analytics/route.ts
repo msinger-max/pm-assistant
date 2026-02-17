@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        jql: `project = ${project} AND status NOT IN (Done, Backlog, "To Do") ORDER BY status ASC`,
+        jql: `project = ${project} AND status NOT IN (Done, Backlog, "To Do", Cancelled) ORDER BY status ASC`,
         fields: ["summary", "status"],
         maxResults: 200,
       }),
