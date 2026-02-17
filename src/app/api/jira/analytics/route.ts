@@ -219,16 +219,22 @@ export async function GET(request: NextRequest) {
     const weeklyData: Array<{ week: string; created: number; completed: number }> = [];
     const start = new Date(startDate);
     const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999); // Include the entire end day
 
     // Get the Monday of the start week
     const startMonday = new Date(start);
     startMonday.setDate(start.getDate() - start.getDay() + (start.getDay() === 0 ? -6 : 1));
+    startMonday.setHours(0, 0, 0, 0);
 
     // Iterate through weeks
     const currentWeek = new Date(startMonday);
     while (currentWeek <= end) {
+      const weekStart = new Date(currentWeek);
+      weekStart.setHours(0, 0, 0, 0);
+
       const weekEnd = new Date(currentWeek);
       weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999); // Include the entire last day of the week
 
       // Format week label (e.g., "Jan 6")
       const weekLabel = currentWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -236,14 +242,14 @@ export async function GET(request: NextRequest) {
       // Count created tickets in this week
       const createdInWeek = createdIssues.filter((issue) => {
         const created = new Date(issue.fields.created);
-        return created >= currentWeek && created <= weekEnd;
+        return created >= weekStart && created <= weekEnd;
       }).length;
 
       // Count completed tickets in this week
       const completedInWeek = completedIssues.filter((issue) => {
         if (!issue.fields.resolutiondate) return false;
         const resolved = new Date(issue.fields.resolutiondate);
-        return resolved >= currentWeek && resolved <= weekEnd;
+        return resolved >= weekStart && resolved <= weekEnd;
       }).length;
 
       weeklyData.push({
