@@ -130,6 +130,40 @@ export async function GET(request: NextRequest) {
     const completedData = await completedResponse.json();
     const completedIssues: JiraIssue[] = completedData.issues || [];
 
+    // Fetch work in progress tickets (not Done, not Backlog)
+    const wipResponse = await fetch(`${baseUrl}/rest/api/3/search/jql`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${email}:${apiToken}`).toString("base64")}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jql: `project = ${project} AND status NOT IN (Done, Backlog, "To Do") ORDER BY status ASC`,
+        fields: ["summary", "status"],
+        maxResults: 200,
+      }),
+      cache: "no-store",
+    });
+
+    let wipByStatus: Array<{ status: string; count: number }> = [];
+    if (wipResponse.ok) {
+      const wipData = await wipResponse.json();
+      const wipIssues: JiraIssue[] = wipData.issues || [];
+
+      // Group by status
+      const statusCounts: Record<string, number> = {};
+      wipIssues.forEach((issue) => {
+        const status = issue.fields.status?.name || "Unknown";
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+
+      // Convert to array and sort by count
+      wipByStatus = Object.entries(statusCounts)
+        .map(([status, count]) => ({ status, count }))
+        .sort((a, b) => b.count - a.count);
+    }
+
     // Calculate metrics
     const ticketsCreated = createdIssues.length;
     const ticketsCompleted = completedIssues.length;
@@ -232,6 +266,7 @@ export async function GET(request: NextRequest) {
       completedByAssignee,
       ticketsByLabel,
       weeklyData,
+      wipByStatus,
     });
   } catch (error) {
     console.error("Error fetching analytics:", error);

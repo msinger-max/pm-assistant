@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -18,6 +20,11 @@ interface WeeklyDataPoint {
   completed: number;
 }
 
+interface WipStatusPoint {
+  status: string;
+  count: number;
+}
+
 interface AnalyticsData {
   ticketsCreated: number;
   ticketsCompleted: number;
@@ -28,6 +35,7 @@ interface AnalyticsData {
   completedByAssignee: Record<string, number>;
   ticketsByLabel: Record<string, number>;
   weeklyData: WeeklyDataPoint[];
+  wipByStatus: WipStatusPoint[];
 }
 
 interface AnalyticsProps {
@@ -338,7 +346,46 @@ export default function Analytics({ project, darkMode = false }: AnalyticsProps)
         </div>
       </div>
 
-      {/* Bar Charts Section */}
+      {/* Work In Progress Chart */}
+      {data.wipByStatus && data.wipByStatus.length > 0 && (
+        <div className={`rounded-2xl p-6 shadow-sm border mb-6 ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
+          <h3 className={`font-semibold mb-4 ${darkMode ? "text-slate-200" : "text-slate-700"}`}>
+            Work In Progress
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.wipByStatus}>
+                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                <XAxis
+                  dataKey="status"
+                  tick={{ fill: darkMode ? "#94a3b8" : "#64748b", fontSize: 12 }}
+                  axisLine={{ stroke: darkMode ? "#475569" : "#cbd5e1" }}
+                />
+                <YAxis
+                  tick={{ fill: darkMode ? "#94a3b8" : "#64748b", fontSize: 12 }}
+                  axisLine={{ stroke: darkMode ? "#475569" : "#cbd5e1" }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: darkMode ? "#1e293b" : "#ffffff",
+                    border: darkMode ? "1px solid #334155" : "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    color: darkMode ? "#f1f5f9" : "#1e293b",
+                  }}
+                />
+                <Bar
+                  dataKey="count"
+                  fill="#818cf8"
+                  radius={[4, 4, 0, 0]}
+                  name="Tickets"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Assignee Charts Section */}
       <div className="grid grid-cols-2 gap-6 mb-6">
         {/* Created by Assignee */}
         <div className={`rounded-2xl p-6 shadow-sm border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
