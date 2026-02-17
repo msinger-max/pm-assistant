@@ -12,7 +12,7 @@ type Tab = "board" | "analytics" | "transcript" | "tickets" | "slack" | "meeting
 
 const PROJECTS = [
   { key: "NTRVSTA", name: "NTRVSTA", color: "from-violet-500 to-purple-600" },
-  { key: "TRACK", name: "TRACK", color: "from-emerald-500 to-teal-600" },
+  { key: "ARC", name: "ARC", color: "from-emerald-500 to-teal-600" },
 ];
 
 export default function Home() {
