@@ -43,6 +43,16 @@ interface AnalyticsMetrics {
   wipByStatus: { status: string; count: number }[];
 }
 
+interface SavedWBR {
+  id: string;
+  approvedAt: string;
+  title: string;
+  wbrData: WBRData;
+  metrics: AnalyticsMetrics[];
+}
+
+const STORAGE_KEY = "pm-assistant-saved-wbrs";
+
 interface WBRGeneratorProps {
   darkMode?: boolean;
 }
@@ -57,7 +67,17 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
   const [error, setError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [savedWBRs, setSavedWBRs] = useState<SavedWBR[]>([]);
+  const [viewingSavedId, setViewingSavedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load saved WBRs from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) setSavedWBRs(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
 
   // Fetch analytics metrics for both projects on mount
   useEffect(() => {
@@ -184,15 +204,51 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  const handleDownload = async () => {
+  const saveWBR = (data: WBRData, savedMetrics: AnalyticsMetrics[]) => {
+    const entry: SavedWBR = {
+      id: Date.now().toString(),
+      approvedAt: new Date().toISOString(),
+      title: data.title,
+      wbrData: data,
+      metrics: savedMetrics,
+    };
+    const updated = [entry, ...savedWBRs];
+    setSavedWBRs(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  };
+
+  const deleteSavedWBR = (id: string) => {
+    const updated = savedWBRs.filter((w) => w.id !== id);
+    setSavedWBRs(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    if (viewingSavedId === id) {
+      setViewingSavedId(null);
+      setWbrData(null);
+    }
+  };
+
+  const viewSavedWBR = (saved: SavedWBR) => {
+    setWbrData(saved.wbrData);
+    setMetrics(saved.metrics);
+    setViewingSavedId(saved.id);
+  };
+
+  const handleApproveAndDownload = async () => {
     if (!wbrData) return;
+    if (!viewingSavedId) {
+      saveWBR(wbrData, metrics);
+    }
+    await buildAndDownloadDocx(wbrData, metrics);
+  };
+
+  const buildAndDownloadDocx = async (data: WBRData, docMetrics: AnalyticsMetrics[]) => {
 
     const children: Paragraph[] = [];
 
     // Title
     children.push(
       new Paragraph({
-        text: wbrData.title,
+        text: data.title,
         heading: HeadingLevel.HEADING_1,
         spacing: { after: 200 },
       })
@@ -208,7 +264,7 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
     );
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: wbrData.overview })],
+        children: [new TextRun({ text: data.overview })],
         spacing: { after: 200 },
       })
     );
@@ -222,7 +278,7 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
       })
     );
 
-    for (const project of wbrData.projectUpdates) {
+    for (const project of data.projectUpdates) {
       children.push(
         new Paragraph({
           text: project.projectName,
@@ -260,7 +316,7 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
       })
     );
 
-    for (const p of wbrData.upcomingPriorities) {
+    for (const p of data.upcomingPriorities) {
       children.push(
         new Paragraph({
           text: p.projectName,
@@ -280,7 +336,7 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
     }
 
     // Metrics Table
-    if (metrics.length > 0) {
+    if (docMetrics.length > 0) {
       children.push(
         new Paragraph({
           text: "Board Metrics",
@@ -297,7 +353,7 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
           })
       );
 
-      const dataRows = metrics.map(
+      const dataRows = docMetrics.map(
         (m) =>
           new TableRow({
             children: [
@@ -343,7 +399,7 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${wbrData.title.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "_")}.docx`;
+    a.download = `${data.title.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "_")}.docx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -508,6 +564,73 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
         </div>
       )}
 
+      {/* Saved WBRs History */}
+      {!wbrData && !isProcessing && savedWBRs.length > 0 && (
+        <div className={`mt-6 rounded-2xl p-6 border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
+          <h4 className={`text-sm font-semibold uppercase tracking-wider mb-4 ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+            Approved WBRs
+          </h4>
+          <div className="space-y-2">
+            {savedWBRs.map((saved) => {
+              const date = new Date(saved.approvedAt);
+              const weekNum = Math.ceil(((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000 + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7);
+              return (
+                <div
+                  key={saved.id}
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                    darkMode ? "bg-slate-700/50 hover:bg-slate-700" : "bg-gray-50 hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                      darkMode ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-700"
+                    }`}>
+                      W{weekNum}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium truncate ${darkMode ? "text-white" : "text-gray-900"}`}>
+                        {saved.title}
+                      </p>
+                      <p className={`text-xs ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                        {date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-3">
+                    <button
+                      onClick={() => viewSavedWBR(saved)}
+                      className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                        darkMode ? "text-slate-300 hover:bg-slate-600" : "text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => buildAndDownloadDocx(saved.wbrData, saved.metrics)}
+                      className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                        darkMode ? "text-violet-400 hover:bg-violet-900/30" : "text-violet-600 hover:bg-violet-50"
+                      }`}
+                    >
+                      Download
+                    </button>
+                    <button
+                      onClick={() => deleteSavedWBR(saved.id)}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        darkMode ? "text-slate-500 hover:text-red-400 hover:bg-slate-600" : "text-gray-400 hover:text-red-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Loading */}
       {isProcessing && (
         <div className={`rounded-2xl p-12 border text-center ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
@@ -529,10 +652,10 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
             </h3>
             <div className="flex gap-2">
               <button
-                onClick={handleDownload}
+                onClick={handleApproveAndDownload}
                 className="px-4 py-2 text-sm rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 transition-all shadow-lg shadow-violet-500/25"
               >
-                Approve & Download .docx
+                {viewingSavedId ? "Download .docx" : "Approve & Download .docx"}
               </button>
               <button
                 onClick={handleCopy}
@@ -545,7 +668,7 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
                 {copySuccess ? "Copied!" : "Copy as Markdown"}
               </button>
               <button
-                onClick={() => { setWbrData(null); setSelectedFiles([]); setPastedText(""); setError(null); }}
+                onClick={() => { setWbrData(null); setSelectedFiles([]); setPastedText(""); setError(null); setViewingSavedId(null); }}
                 className={`px-4 py-2 text-sm rounded-xl ${
                   darkMode ? "bg-slate-700 text-slate-300 hover:bg-slate-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
