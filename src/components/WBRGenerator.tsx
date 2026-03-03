@@ -45,13 +45,12 @@ interface AnalyticsMetrics {
 
 interface SavedWBR {
   id: string;
+  url: string;
   approvedAt: string;
   title: string;
   wbrData: WBRData;
   metrics: AnalyticsMetrics[];
 }
-
-const STORAGE_KEY = "pm-assistant-saved-wbrs";
 
 interface WBRGeneratorProps {
   darkMode?: boolean;
@@ -71,12 +70,19 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
   const [viewingSavedId, setViewingSavedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load saved WBRs from localStorage on mount
-  useEffect(() => {
+  // Load saved WBRs from API on mount
+  const loadSavedWBRs = async () => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setSavedWBRs(JSON.parse(stored));
-    } catch { /* ignore */ }
+      const res = await fetch("/api/wbr/saved");
+      const data = await res.json();
+      if (data.saved) setSavedWBRs(data.saved);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    loadSavedWBRs();
   }, []);
 
   // Fetch analytics metrics for both projects on mount
@@ -204,26 +210,39 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  const saveWBR = (data: WBRData, savedMetrics: AnalyticsMetrics[]) => {
-    const entry: SavedWBR = {
-      id: Date.now().toString(),
-      approvedAt: new Date().toISOString(),
-      title: data.title,
-      wbrData: data,
-      metrics: savedMetrics,
-    };
-    const updated = [entry, ...savedWBRs];
-    setSavedWBRs(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  const saveWBR = async (data: WBRData, savedMetrics: AnalyticsMetrics[]) => {
+    try {
+      const res = await fetch("/api/wbr/saved", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: data.title,
+          wbrData: data,
+          metrics: savedMetrics,
+        }),
+      });
+      if (res.ok) {
+        await loadSavedWBRs();
+      }
+    } catch (err) {
+      console.error("Failed to save WBR:", err);
+    }
   };
 
-  const deleteSavedWBR = (id: string) => {
-    const updated = savedWBRs.filter((w) => w.id !== id);
-    setSavedWBRs(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    if (viewingSavedId === id) {
-      setViewingSavedId(null);
-      setWbrData(null);
+  const deleteSavedWBR = async (id: string) => {
+    const saved = savedWBRs.find((w) => w.id === id);
+    if (!saved) return;
+    try {
+      await fetch(`/api/wbr/saved?url=${encodeURIComponent(saved.url)}`, {
+        method: "DELETE",
+      });
+      await loadSavedWBRs();
+      if (viewingSavedId === id) {
+        setViewingSavedId(null);
+        setWbrData(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete WBR:", err);
     }
   };
 
@@ -236,7 +255,7 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
   const handleApproveAndDownload = async () => {
     if (!wbrData) return;
     if (!viewingSavedId) {
-      saveWBR(wbrData, metrics);
+      await saveWBR(wbrData, metrics);
     }
     await buildAndDownloadDocx(wbrData, metrics);
   };
