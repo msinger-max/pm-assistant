@@ -7,8 +7,9 @@ import SlackMessenger from "@/components/SlackMessenger";
 import TodaysMeetings from "@/components/TodaysMeetings";
 import BoardView from "@/components/BoardView";
 import Analytics from "@/components/Analytics";
+import WBRGenerator from "@/components/WBRGenerator";
 
-type Tab = "board" | "analytics" | "transcript" | "tickets" | "slack" | "meetings";
+type Tab = "board" | "analytics" | "transcript" | "wbr" | "tickets" | "slack" | "meetings";
 
 const PROJECTS = [
   { key: "NTRVSTA", name: "NTRVSTA", color: "from-violet-500 to-purple-600" },
@@ -54,6 +55,11 @@ export default function Home() {
     { id: "transcript" as Tab, label: "Transcripts", icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    )},
+    { id: "wbr" as Tab, label: "WBR", icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     )},
     { id: "tickets" as Tab, label: "Stale Tickets", icon: (
@@ -181,6 +187,7 @@ export default function Home() {
           {activeTab === "board" && <BoardView project={activeProject.key} darkMode={darkMode} />}
           {activeTab === "analytics" && <Analytics project={activeProject.key} darkMode={darkMode} />}
           {activeTab === "transcript" && <TranscriptProcessor darkMode={darkMode} />}
+          {activeTab === "wbr" && <WBRGenerator darkMode={darkMode} />}
           {activeTab === "tickets" && <StaleTickets project={activeProject.key} darkMode={darkMode} />}
           {activeTab === "slack" && <SlackMessenger darkMode={darkMode} />}
           {activeTab === "meetings" && <TodaysMeetings darkMode={darkMode} />}

@@ -15,6 +15,7 @@ interface JiraIssue {
       displayName: string;
     } | null;
     created: string;
+    updated: string;
     resolutiondate: string | null;
     labels: string[];
   };
@@ -73,6 +74,11 @@ export async function GET(request: NextRequest) {
 
   const { startDate, endDate } = getDateRange(range);
 
+  // Calculate endDate + 1 day for JQL queries (Jira's <= compares to start of day)
+  const endDatePlusOne = new Date(endDate);
+  endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+  const endDateForQuery = endDatePlusOne.toISOString().split("T")[0];
+
   try {
     // Fetch created tickets in date range
     const createdResponse = await fetch(`${baseUrl}/rest/api/3/search/jql`, {
@@ -83,7 +89,7 @@ export async function GET(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        jql: `project = ${project} AND created >= "${startDate}" AND created <= "${endDate}" ORDER BY created DESC`,
+        jql: `project = ${project} AND created >= "${startDate}" AND created < "${endDateForQuery}" ORDER BY created DESC`,
         fields: ["summary", "status", "assignee", "creator", "created", "labels"],
         maxResults: 200,
       }),
@@ -102,7 +108,7 @@ export async function GET(request: NextRequest) {
     const createdData = await createdResponse.json();
     const createdIssues: JiraIssue[] = createdData.issues || [];
 
-    // Fetch completed tickets in date range
+    // Fetch completed tickets in date range (using updated date to track when moved to Done)
     const completedResponse = await fetch(`${baseUrl}/rest/api/3/search/jql`, {
       method: "POST",
       headers: {
@@ -111,8 +117,8 @@ export async function GET(request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        jql: `project = ${project} AND status = Done AND resolutiondate >= "${startDate}" AND resolutiondate <= "${endDate}" ORDER BY resolutiondate DESC`,
-        fields: ["summary", "status", "assignee", "creator", "created", "resolutiondate", "labels"],
+        jql: `project = ${project} AND status = Done AND updated >= "${startDate}" AND updated < "${endDateForQuery}" ORDER BY updated DESC`,
+        fields: ["summary", "status", "assignee", "creator", "created", "updated", "resolutiondate", "labels"],
         maxResults: 200,
       }),
       cache: "no-store",
@@ -171,13 +177,13 @@ export async function GET(request: NextRequest) {
       ? Math.round((ticketsCompleted / ticketsCreated) * 100)
       : 0;
 
-    // Calculate average time open for completed tickets
+    // Calculate average time open for completed tickets (using updated as completion date)
     let totalDaysOpen = 0;
     completedIssues.forEach((issue) => {
-      if (issue.fields.resolutiondate && issue.fields.created) {
+      if (issue.fields.updated && issue.fields.created) {
         const created = new Date(issue.fields.created);
-        const resolved = new Date(issue.fields.resolutiondate);
-        const daysOpen = (resolved.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+        const completed = new Date(issue.fields.updated);
+        const daysOpen = (completed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
         totalDaysOpen += daysOpen;
       }
     });
@@ -216,40 +222,60 @@ export async function GET(request: NextRequest) {
     });
 
     // Generate weekly data for charts
+    // Use date strings (YYYY-MM-DD) to avoid timezone issues
     const weeklyData: Array<{ week: string; created: number; completed: number }> = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999); // Include the entire end day
 
-    // Get the Monday of the start week
-    const startMonday = new Date(start);
-    startMonday.setDate(start.getDate() - start.getDay() + (start.getDay() === 0 ? -6 : 1));
-    startMonday.setHours(0, 0, 0, 0);
+    // Helper to extract date string from Jira timestamp (e.g., "2025-02-17T10:30:00.000-0800" -> "2025-02-17")
+    const getDateString = (isoString: string): string => {
+      return isoString.split("T")[0];
+    };
 
-    // Iterate through weeks
-    const currentWeek = new Date(startMonday);
-    while (currentWeek <= end) {
-      const weekStart = new Date(currentWeek);
-      weekStart.setHours(0, 0, 0, 0);
+    // Helper to get Monday of a week for a given date string
+    const getMondayOfWeek = (dateStr: string): string => {
+      const [year, month, day] = dateStr.split("-").map(Number);
+      const date = new Date(year, month - 1, day); // Use local date
+      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to get Monday
+      date.setDate(date.getDate() + diff);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    };
 
-      const weekEnd = new Date(currentWeek);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999); // Include the entire last day of the week
+    // Helper to add days to a date string
+    const addDays = (dateStr: string, days: number): string => {
+      const [year, month, day] = dateStr.split("-").map(Number);
+      const date = new Date(year, month - 1, day);
+      date.setDate(date.getDate() + days);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    };
+
+    // Helper to format date for display
+    const formatWeekLabel = (dateStr: string): string => {
+      const [year, month, day] = dateStr.split("-").map(Number);
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    };
+
+    // Get Monday of start week and end date
+    const startMondayStr = getMondayOfWeek(startDate);
+    let currentMondayStr = startMondayStr;
+
+    while (currentMondayStr <= endDate) {
+      const weekEndStr = addDays(currentMondayStr, 6); // Sunday of this week
 
       // Format week label (e.g., "Jan 6")
-      const weekLabel = currentWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const weekLabel = formatWeekLabel(currentMondayStr);
 
-      // Count created tickets in this week
+      // Count created tickets in this week (compare date strings)
       const createdInWeek = createdIssues.filter((issue) => {
-        const created = new Date(issue.fields.created);
-        return created >= weekStart && created <= weekEnd;
+        const createdDate = getDateString(issue.fields.created);
+        return createdDate >= currentMondayStr && createdDate <= weekEndStr;
       }).length;
 
-      // Count completed tickets in this week
+      // Count completed tickets in this week (using updated date)
       const completedInWeek = completedIssues.filter((issue) => {
-        if (!issue.fields.resolutiondate) return false;
-        const resolved = new Date(issue.fields.resolutiondate);
-        return resolved >= weekStart && resolved <= weekEnd;
+        if (!issue.fields.updated) return false;
+        const completedDate = getDateString(issue.fields.updated);
+        return completedDate >= currentMondayStr && completedDate <= weekEndStr;
       }).length;
 
       weeklyData.push({
@@ -259,7 +285,7 @@ export async function GET(request: NextRequest) {
       });
 
       // Move to next week
-      currentWeek.setDate(currentWeek.getDate() + 7);
+      currentMondayStr = addDays(currentMondayStr, 7);
     }
 
     return NextResponse.json({

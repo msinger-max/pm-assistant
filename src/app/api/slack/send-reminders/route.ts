@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+const SENDER_USER_ID = process.env.SLACK_SENDER_USER_ID || "U09R810F272"; // Matias Singer
 
 // Mapping of Jira names to Slack user IDs
 const SLACK_USER_IDS: Record<string, string> = {
@@ -19,6 +20,25 @@ interface Ticket {
 }
 
 async function sendSlackDM(userId: string, message: string) {
+  // Open a group DM (MPIM) that includes the sender so they can see the conversation
+  const openResponse = await fetch("https://slack.com/api/conversations.open", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+    },
+    body: JSON.stringify({
+      users: `${SENDER_USER_ID},${userId}`,
+    }),
+  });
+
+  const openData = await openResponse.json();
+  if (!openData.ok) {
+    return openData;
+  }
+
+  const channelId = openData.channel.id;
+
   const response = await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
     headers: {
@@ -26,7 +46,7 @@ async function sendSlackDM(userId: string, message: string) {
       Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
     },
     body: JSON.stringify({
-      channel: userId,
+      channel: channelId,
       text: message,
     }),
   });
