@@ -101,12 +101,16 @@ The WBR must follow this exact JSON structure:
   ]
 }
 
+Important context:
+- Today's date is ${new Date().toISOString().split("T")[0]}
+- Use this to calculate the correct ISO week number for the title
+
 Rules:
 - Group updates under the correct project (NTRVSTA or ARC/TRACKER)
 - If the input does not clearly separate projects, make your best inference
 - Create meaningful subsection groupings (e.g., by feature area, tech domain)
 - The overview should be 2-4 sentences summarizing the week's key achievements and focus areas
-- Infer the week number and date range from the input if possible, otherwise use placeholder text
+- Use the current date to determine the correct week number (ISO week). If the input references a specific date range, use that instead
 - Be detailed and specific in bullet points - include technical details, names, and metrics mentioned
 - Return ONLY valid JSON, no additional text
 
