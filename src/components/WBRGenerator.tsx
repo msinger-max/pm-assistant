@@ -1,6 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  AlignmentType,
+  BorderStyle,
+} from "docx";
 
 interface WBRProjectUpdate {
   projectName: string;
@@ -169,6 +182,172 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
     await navigator.clipboard.writeText(wbrToMarkdown(wbrData));
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const handleDownload = async () => {
+    if (!wbrData) return;
+
+    const children: Paragraph[] = [];
+
+    // Title
+    children.push(
+      new Paragraph({
+        text: wbrData.title,
+        heading: HeadingLevel.HEADING_1,
+        spacing: { after: 200 },
+      })
+    );
+
+    // Overview
+    children.push(
+      new Paragraph({
+        text: "Overview",
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 100 },
+      })
+    );
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: wbrData.overview })],
+        spacing: { after: 200 },
+      })
+    );
+
+    // Detailed Updates per Project
+    children.push(
+      new Paragraph({
+        text: "Detailed Updates per Project",
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 100 },
+      })
+    );
+
+    for (const project of wbrData.projectUpdates) {
+      children.push(
+        new Paragraph({
+          text: project.projectName,
+          heading: HeadingLevel.HEADING_3,
+          spacing: { before: 200, after: 100 },
+        })
+      );
+
+      for (const sub of project.subsections) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: sub.title, bold: true })],
+            spacing: { before: 150, after: 50 },
+          })
+        );
+
+        for (const bullet of sub.bullets) {
+          children.push(
+            new Paragraph({
+              children: [new TextRun({ text: bullet })],
+              bullet: { level: 0 },
+              spacing: { after: 40 },
+            })
+          );
+        }
+      }
+    }
+
+    // Upcoming Priorities
+    children.push(
+      new Paragraph({
+        text: "Upcoming Priorities",
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 100 },
+      })
+    );
+
+    for (const p of wbrData.upcomingPriorities) {
+      children.push(
+        new Paragraph({
+          text: p.projectName,
+          heading: HeadingLevel.HEADING_3,
+          spacing: { before: 200, after: 50 },
+        })
+      );
+      for (const item of p.items) {
+        children.push(
+          new Paragraph({
+            children: [new TextRun({ text: item })],
+            bullet: { level: 0 },
+            spacing: { after: 40 },
+          })
+        );
+      }
+    }
+
+    // Metrics Table
+    if (metrics.length > 0) {
+      children.push(
+        new Paragraph({
+          text: "Board Metrics",
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 300, after: 100 },
+        })
+      );
+
+      const headerCells = ["Project", "Created", "Completed", "Completion Rate", "Avg Time Open", "Velocity"].map(
+        (text) =>
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 20 })] , alignment: AlignmentType.CENTER })],
+            width: { size: 1666, type: WidthType.DXA },
+          })
+      );
+
+      const dataRows = metrics.map(
+        (m) =>
+          new TableRow({
+            children: [
+              m.project,
+              String(m.ticketsCreated),
+              String(m.ticketsCompleted),
+              `${m.completionRate}%`,
+              `${m.avgTimeOpen}d`,
+              `${m.avgVelocity}/wk`,
+            ].map(
+              (text) =>
+                new TableCell({
+                  children: [new Paragraph({ children: [new TextRun({ text, size: 20 })], alignment: AlignmentType.CENTER })],
+                  width: { size: 1666, type: WidthType.DXA },
+                })
+            ),
+          })
+      );
+
+      const table = new Table({
+        rows: [new TableRow({ children: headerCells }), ...dataRows],
+        width: { size: 10000, type: WidthType.DXA },
+        borders: {
+          top: { style: BorderStyle.SINGLE, size: 1 },
+          bottom: { style: BorderStyle.SINGLE, size: 1 },
+          left: { style: BorderStyle.SINGLE, size: 1 },
+          right: { style: BorderStyle.SINGLE, size: 1 },
+          insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+          insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+        },
+      });
+
+      children.push(new Paragraph({ spacing: { before: 100 } }));
+      // @ts-expect-error - docx Table is valid as document section child
+      children.push(table);
+    }
+
+    const doc = new Document({
+      sections: [{ children }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${wbrData.title.replace(/[^a-zA-Z0-9\s-]/g, "").replace(/\s+/g, "_")}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const projectColor = (name: string) =>
@@ -349,6 +528,12 @@ export default function WBRGenerator({ darkMode = false }: WBRGeneratorProps) {
               {wbrData.title}
             </h3>
             <div className="flex gap-2">
+              <button
+                onClick={handleDownload}
+                className="px-4 py-2 text-sm rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 transition-all shadow-lg shadow-violet-500/25"
+              >
+                Approve & Download .docx
+              </button>
               <button
                 onClick={handleCopy}
                 className={`px-4 py-2 text-sm rounded-xl transition-all ${
