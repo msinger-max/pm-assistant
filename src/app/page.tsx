@@ -125,14 +125,14 @@ export default function Home() {
         {/* Logo */}
         <div className={`p-6 border-b ${darkMode ? "border-slate-700" : "border-slate-100"}`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/25">
+            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.348 14.652a3.75 3.75 0 010-5.304m5.304 0a3.75 3.75 0 010 5.304m-7.425 2.121a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.788m13.788 0c3.808 3.808 3.808 9.98 0 13.788M12 12h.008v.008H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
               </svg>
             </div>
             <div>
-              <h1 className={`text-lg font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>PM Assistant</h1>
-              <p className={`text-xs ${darkMode ? "text-slate-400" : "text-slate-400"}`}>Productivity hub</p>
+              <h1 className={`text-lg font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>Radar</h1>
+              <p className={`text-xs ${darkMode ? "text-slate-400" : "text-slate-400"}`}>by RyzLabs</p>
             </div>
             {/* Dark Mode Toggle */}
             <button

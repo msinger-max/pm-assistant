@@ -23,12 +23,12 @@ export default function Login({ darkMode }: LoginProps) {
       <div className={`w-full max-w-md p-8 rounded-2xl shadow-xl border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/25 mb-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/25 mb-4">
             <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.348 14.652a3.75 3.75 0 010-5.304m5.304 0a3.75 3.75 0 010 5.304m-7.425 2.121a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.788m13.788 0c3.808 3.808 3.808 9.98 0 13.788M12 12h.008v.008H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
             </svg>
           </div>
-          <h1 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>PM Assistant</h1>
+          <h1 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>Radar</h1>
           <p className={`text-sm mt-1 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Sign in with your RyzLabs account</p>
         </div>
 
