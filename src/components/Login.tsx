@@ -23,7 +23,7 @@ export default function Login({ darkMode }: LoginProps) {
       <div className={`w-full max-w-md p-8 rounded-2xl shadow-xl border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/25 mb-4 p-2.5">
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg mb-4 p-2.5 ${darkMode ? "bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/25" : "bg-[#813ef2] shadow-purple-500/25"}`}>
             <img src="/ryzlabs-logo.svg" alt="RyzLabs" className="w-full h-full" />
           </div>
           <h1 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>Radar</h1>

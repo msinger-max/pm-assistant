@@ -125,7 +125,7 @@ export default function Home() {
         {/* Logo */}
         <div className={`p-6 border-b ${darkMode ? "border-slate-700" : "border-slate-100"}`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25 p-1.5">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg p-1.5 ${darkMode ? "bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/25" : "bg-[#813ef2] shadow-purple-500/25"}`}>
               <img src="/ryzlabs-logo.svg" alt="RyzLabs" className="w-full h-full" />
             </div>
             <div>
