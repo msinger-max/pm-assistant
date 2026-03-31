@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.101.0",
     "@vercel/blob": "^1.1.1",
     "docx": "^9.6.0",
     "mammoth": "^1.11.0",

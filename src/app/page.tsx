@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase";
+import Login from "@/components/Login";
 import TranscriptProcessor from "@/components/TranscriptProcessor";
 import StaleTickets from "@/components/StaleTickets";
 import SlackMessenger from "@/components/SlackMessenger";
@@ -20,6 +23,25 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("board");
   const [activeProject, setActiveProject] = useState(PROJECTS[0]);
   const [darkMode, setDarkMode] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    // Check current session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     // Check for saved preference or system preference
@@ -78,6 +100,23 @@ export default function Home() {
       </svg>
     )},
   ];
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
+  if (loading) {
+    return (
+      <div className={`flex min-h-screen items-center justify-center ${darkMode ? "bg-slate-900" : "bg-slate-50"}`}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login darkMode={darkMode} />;
+  }
 
   return (
     <div className={`flex min-h-screen ${darkMode ? "bg-slate-900" : "bg-slate-50"}`}>
@@ -177,6 +216,40 @@ export default function Home() {
                 )}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* User Profile */}
+        <div className={`p-4 border-t ${darkMode ? "border-slate-700" : "border-slate-100"}`}>
+          <div className="flex items-center gap-3">
+            {user.user_metadata?.avatar_url ? (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt=""
+                className="w-8 h-8 rounded-full"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-violet-500 flex items-center justify-center text-white text-sm font-medium">
+                {(user.email || "?")[0].toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-medium truncate ${darkMode ? "text-slate-200" : "text-slate-700"}`}>
+                {user.user_metadata?.full_name || user.email}
+              </p>
+              <p className={`text-xs truncate ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+                {user.email}
+              </p>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className={`p-1.5 rounded-lg transition-colors ${darkMode ? "hover:bg-slate-700 text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}
+              title="Sign out"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         </div>
       </aside>
