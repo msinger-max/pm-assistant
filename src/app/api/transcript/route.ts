@@ -7,7 +7,9 @@ type Priority = "high" | "medium" | "low";
 type ActionItem = {
   id: string;
   task: string;
+  description: string;
   assignee: string;
+  label: string;
   priority: Priority;
   selected: boolean;
 };
@@ -39,21 +41,32 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
+        max_tokens: 2048,
         messages: [
           {
             role: "user",
             content: `Analyze this meeting transcript and extract two things:
 
-1. **New action items** - tasks that need to be created
+1. **New action items** - tasks that need to be created as Jira tickets
 2. **Ticket updates** - references to existing Jira tickets that need status changes (look for patterns like "NTRVSTA-123", "ARC-45", or mentions of moving tickets to done/in progress/testing)
+
+Known team members (use exact names for assignee):
+- Agustin Daverede
+- Ieltxu Algañaras
+- Mauro Gilardenghi
+- Rodrigo Gasha
+- Matias Singer
+
+Valid labels: Bug, Feature, Enhancement, Task
 
 Return ONLY valid JSON with this exact format, no other text:
 {
   "actionItems": [
     {
-      "task": "description of the task",
-      "assignee": "person name or Unassigned",
+      "task": "Short summary for the ticket title",
+      "description": "Detailed description with context from the transcript. Include acceptance criteria, technical details, or relevant discussion points mentioned in the meeting.",
+      "assignee": "Person Name or Unassigned",
+      "label": "Feature",
       "priority": "high"
     }
   ],
@@ -67,8 +80,13 @@ Return ONLY valid JSON with this exact format, no other text:
 }
 
 Rules:
-- For action items: be specific and actionable. Use "high" priority only for urgent/blocking items.
-- For ticket updates: only include if a specific ticket key is mentioned AND a status change is discussed.
+- For action items:
+  - "task" should be a concise ticket title (1 line)
+  - "description" should be a detailed paragraph with context from the transcript - what was discussed, why it matters, any technical details or requirements mentioned
+  - "assignee" must match one of the known team members exactly, or "Unassigned" if unclear
+  - "label" must be one of: Bug, Feature, Enhancement, Task
+  - "priority": use "high" only for urgent/blocking items
+- For ticket updates: only include if a specific ticket key is mentioned AND a status change is discussed
 - Valid statuses: "To Do", "In Progress", "Testing", "Done"
 - If no action items found, use empty array. Same for ticket updates.
 
@@ -123,11 +141,13 @@ ${transcript}`,
         }
       )
       .map((item: unknown, index: number) => {
-        const i = item as { task: string; assignee?: string; priority?: string };
+        const i = item as { task: string; description?: string; assignee?: string; label?: string; priority?: string };
         return {
           id: String(index + 1),
           task: i.task.trim(),
+          description: (i.description || "").trim(),
           assignee: (i.assignee || "Unassigned").trim(),
+          label: (i.label || "Task").trim(),
           priority: (i.priority || "medium") as Priority,
           selected: true,
         };

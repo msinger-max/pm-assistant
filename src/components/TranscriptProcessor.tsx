@@ -5,7 +5,9 @@ import { useState } from "react";
 interface ActionItem {
   id: string;
   task: string;
+  description: string;
   assignee: string;
+  label: string;
   priority: "high" | "medium" | "low";
   selected: boolean;
 }
@@ -37,6 +39,18 @@ const PROJECTS = [
   { key: "ARC", name: "ARC" },
 ];
 
+const TEAM_MEMBERS = [
+  "Unassigned",
+  "Agustin Daverede",
+  "Ieltxu Algañaras",
+  "Matias Singer",
+  "Mauro Gilardenghi",
+  "Rodrigo Gasha",
+];
+
+const LABELS = ["Bug", "Feature", "Enhancement", "Task"];
+const PRIORITIES: ("high" | "medium" | "low")[] = ["high", "medium", "low"];
+
 export default function TranscriptProcessor({ darkMode = false }: TranscriptProcessorProps) {
   const [transcript, setTranscript] = useState("");
   const [selectedProject, setSelectedProject] = useState(PROJECTS[0].key);
@@ -47,6 +61,7 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
   const [isUpdatingTickets, setIsUpdatingTickets] = useState(false);
   const [createdTickets, setCreatedTickets] = useState<CreatedTicket[]>([]);
   const [updatedTickets, setUpdatedTickets] = useState<UpdatedTicket[]>([]);
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleProcess = async () => {
@@ -58,6 +73,7 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
     setTicketUpdates([]);
     setCreatedTickets([]);
     setUpdatedTickets([]);
+    setExpandedItem(null);
 
     try {
       const response = await fetch("/api/transcript", {
@@ -91,6 +107,14 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
     );
   };
 
+  const updateItem = (id: string, field: keyof ActionItem, value: string) => {
+    setActionItems((items) =>
+      items.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  };
+
   const toggleUpdate = (issueKey: string) => {
     setTicketUpdates((updates) =>
       updates.map((u) =>
@@ -113,7 +137,9 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
         body: JSON.stringify({
           tickets: selectedItems.map((item) => ({
             task: item.task,
+            description: item.description,
             assignee: item.assignee,
+            label: item.label,
             priority: item.priority,
             project: selectedProject,
           })),
@@ -130,8 +156,8 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
       if (data.failed?.length > 0) {
         setError(`${data.failed.length} ticket(s) failed to create`);
       }
-      // Remove created items
       setActionItems((items) => items.filter((i) => !i.selected));
+      setExpandedItem(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create tickets");
     } finally {
@@ -176,7 +202,6 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
     if (errors.length > 0) {
       setError(errors.join("\n"));
     }
-    // Remove updated items
     const updatedKeys = new Set(results.map((r) => r.issueKey));
     setTicketUpdates((updates) => updates.filter((u) => !updatedKeys.has(u.issueKey)));
     setIsUpdatingTickets(false);
@@ -187,6 +212,7 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
     setTicketUpdates([]);
     setCreatedTickets([]);
     setUpdatedTickets([]);
+    setExpandedItem(null);
     setError(null);
   };
 
@@ -196,12 +222,31 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
     low: darkMode ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700",
   };
 
+  const labelColors: Record<string, string> = {
+    Bug: darkMode ? "bg-red-900/30 text-red-400" : "bg-red-100 text-red-700",
+    Feature: darkMode ? "bg-blue-900/30 text-blue-400" : "bg-blue-100 text-blue-700",
+    Enhancement: darkMode ? "bg-purple-900/30 text-purple-400" : "bg-purple-100 text-purple-700",
+    Task: darkMode ? "bg-slate-700 text-slate-300" : "bg-slate-100 text-slate-700",
+  };
+
   const statusColors: Record<string, string> = {
     "To Do": darkMode ? "bg-slate-700 text-slate-300" : "bg-slate-100 text-slate-700",
     "In Progress": darkMode ? "bg-blue-900/30 text-blue-400" : "bg-blue-100 text-blue-700",
     "Testing": darkMode ? "bg-purple-900/30 text-purple-400" : "bg-purple-100 text-purple-700",
     "Done": darkMode ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700",
   };
+
+  const inputClass = `w-full px-3 py-2 rounded-lg border text-sm transition-all ${
+    darkMode
+      ? "bg-slate-700 border-slate-600 text-white"
+      : "bg-white border-gray-300 text-gray-900"
+  }`;
+
+  const selectClass = `px-3 py-2 rounded-lg border text-sm transition-all ${
+    darkMode
+      ? "bg-slate-700 border-slate-600 text-white"
+      : "bg-white border-gray-300 text-gray-900"
+  }`;
 
   return (
     <div>
@@ -263,14 +308,14 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
       {actionItems.length > 0 && (
         <div className={`rounded-2xl p-6 border mb-6 ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
           <h3 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
-            New Action Items
+            New Action Items ({actionItems.length})
           </h3>
 
           <div className="space-y-3 mb-6">
             {actionItems.map((item) => (
               <div
                 key={item.id}
-                className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                className={`rounded-xl border transition-all ${
                   item.selected
                     ? darkMode
                       ? "border-violet-500/50 bg-violet-900/20"
@@ -280,21 +325,128 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
                       : "border-gray-200"
                 }`}
               >
-                <input
-                  type="checkbox"
-                  checked={item.selected}
-                  onChange={() => toggleItem(item.id)}
-                  className="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                />
-                <div className="flex-1">
-                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>{item.task}</p>
-                  <p className={`text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>Assignee: {item.assignee}</p>
-                </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${priorityColors[item.priority]}`}
+                {/* Header row - always visible */}
+                <div
+                  className="flex items-center gap-4 p-4 cursor-pointer"
+                  onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}
                 >
-                  {item.priority}
-                </span>
+                  <input
+                    type="checkbox"
+                    checked={item.selected}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      toggleItem(item.id);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium truncate ${darkMode ? "text-white" : "text-gray-900"}`}>
+                      {item.task}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                        {item.assignee}
+                      </span>
+                      <span className={`text-xs ${darkMode ? "text-slate-600" : "text-gray-300"}`}>|</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${labelColors[item.label] || labelColors.Task}`}>
+                        {item.label}
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-medium shrink-0 ${priorityColors[item.priority]}`}
+                  >
+                    {item.priority}
+                  </span>
+                  <svg
+                    className={`w-5 h-5 transition-transform shrink-0 ${expandedItem === item.id ? "rotate-180" : ""} ${darkMode ? "text-slate-400" : "text-gray-400"}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+
+                {/* Expanded edit form */}
+                {expandedItem === item.id && (
+                  <div className={`px-4 pb-4 pt-2 border-t ${darkMode ? "border-slate-700" : "border-gray-200"}`}>
+                    <div className="grid grid-cols-1 gap-3">
+                      {/* Title */}
+                      <div>
+                        <label className={`text-xs font-medium mb-1 block ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                          Title
+                        </label>
+                        <input
+                          type="text"
+                          value={item.task}
+                          onChange={(e) => updateItem(item.id, "task", e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        <label className={`text-xs font-medium mb-1 block ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                          Description
+                        </label>
+                        <textarea
+                          value={item.description}
+                          onChange={(e) => updateItem(item.id, "description", e.target.value)}
+                          rows={3}
+                          className={`${inputClass} resize-none`}
+                        />
+                      </div>
+
+                      {/* Assignee, Label, Priority row */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className={`text-xs font-medium mb-1 block ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                            Assignee
+                          </label>
+                          <select
+                            value={item.assignee}
+                            onChange={(e) => updateItem(item.id, "assignee", e.target.value)}
+                            className={selectClass}
+                          >
+                            {TEAM_MEMBERS.map((m) => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`text-xs font-medium mb-1 block ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                            Label
+                          </label>
+                          <select
+                            value={item.label}
+                            onChange={(e) => updateItem(item.id, "label", e.target.value)}
+                            className={selectClass}
+                          >
+                            {LABELS.map((l) => (
+                              <option key={l} value={l}>{l}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`text-xs font-medium mb-1 block ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                            Priority
+                          </label>
+                          <select
+                            value={item.priority}
+                            onChange={(e) => updateItem(item.id, "priority", e.target.value)}
+                            className={selectClass}
+                          >
+                            {PRIORITIES.map((p) => (
+                              <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 
 interface TicketRequest {
   task: string;
+  description: string;
   assignee: string;
+  label: string;
   priority: "high" | "medium" | "low";
   project: string;
 }
@@ -35,22 +37,70 @@ export async function POST(request: Request) {
       );
     }
 
+    const authHeader = `Basic ${Buffer.from(`${email}:${apiToken}`).toString("base64")}`;
+
+    // Lookup assignee account IDs
+    const assigneeCache: Record<string, string | null> = {};
+    const lookupAssignee = async (name: string): Promise<string | null> => {
+      if (name === "Unassigned" || !name) return null;
+      if (assigneeCache[name] !== undefined) return assigneeCache[name];
+
+      try {
+        const res = await fetch(
+          `${baseUrl}/rest/api/3/user/search?query=${encodeURIComponent(name)}&maxResults=1`,
+          { headers: { Authorization: authHeader, Accept: "application/json" } }
+        );
+        if (res.ok) {
+          const users = await res.json();
+          assigneeCache[name] = users[0]?.accountId || null;
+        } else {
+          assigneeCache[name] = null;
+        }
+      } catch {
+        assigneeCache[name] = null;
+      }
+      return assigneeCache[name];
+    };
+
     const results = await Promise.all(
       tickets.map(async (ticket) => {
         try {
-          const body: Record<string, unknown> = {
-            fields: {
-              project: { key: ticket.project },
-              summary: ticket.task,
-              issuetype: { name: "Task" },
-              priority: { name: PRIORITY_MAP[ticket.priority] || "Medium" },
-            },
+          const assigneeId = await lookupAssignee(ticket.assignee);
+
+          const fields: Record<string, unknown> = {
+            project: { key: ticket.project },
+            summary: ticket.task,
+            issuetype: { name: "Task" },
+            priority: { name: PRIORITY_MAP[ticket.priority] || "Medium" },
           };
+
+          if (ticket.description) {
+            fields.description = {
+              type: "doc",
+              version: 1,
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: ticket.description }],
+                },
+              ],
+            };
+          }
+
+          if (ticket.label) {
+            fields.labels = [ticket.label.toLowerCase()];
+          }
+
+          if (assigneeId) {
+            fields.assignee = { accountId: assigneeId };
+          }
+
+          const body = { fields };
 
           const response = await fetch(`${baseUrl}/rest/api/3/issue`, {
             method: "POST",
             headers: {
-              Authorization: `Basic ${Buffer.from(`${email}:${apiToken}`).toString("base64")}`,
+              Authorization: authHeader,
               Accept: "application/json",
               "Content-Type": "application/json",
             },
