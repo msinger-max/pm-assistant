@@ -10,15 +10,43 @@ interface ActionItem {
   selected: boolean;
 }
 
+interface TicketUpdate {
+  issueKey: string;
+  targetStatus: string;
+  reason: string;
+  selected: boolean;
+}
+
+interface CreatedTicket {
+  key: string;
+  task: string;
+  url: string;
+}
+
+interface UpdatedTicket {
+  issueKey: string;
+  newStatus: string;
+}
+
 interface TranscriptProcessorProps {
   darkMode?: boolean;
 }
 
+const PROJECTS = [
+  { key: "NTRVSTA", name: "NTRVSTA" },
+  { key: "ARC", name: "ARC" },
+];
+
 export default function TranscriptProcessor({ darkMode = false }: TranscriptProcessorProps) {
   const [transcript, setTranscript] = useState("");
+  const [selectedProject, setSelectedProject] = useState(PROJECTS[0].key);
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
+  const [ticketUpdates, setTicketUpdates] = useState<TicketUpdate[]>([]);
   const [isCreatingTickets, setIsCreatingTickets] = useState(false);
+  const [isUpdatingTickets, setIsUpdatingTickets] = useState(false);
+  const [createdTickets, setCreatedTickets] = useState<CreatedTicket[]>([]);
+  const [updatedTickets, setUpdatedTickets] = useState<UpdatedTicket[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const handleProcess = async () => {
@@ -27,6 +55,9 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
     setIsProcessing(true);
     setError(null);
     setActionItems([]);
+    setTicketUpdates([]);
+    setCreatedTickets([]);
+    setUpdatedTickets([]);
 
     try {
       const response = await fetch("/api/transcript", {
@@ -42,6 +73,7 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
       }
 
       setActionItems(data.items ?? []);
+      setTicketUpdates(data.ticketUpdates ?? []);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to process transcript.";
@@ -59,19 +91,103 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
     );
   };
 
+  const toggleUpdate = (issueKey: string) => {
+    setTicketUpdates((updates) =>
+      updates.map((u) =>
+        u.issueKey === issueKey ? { ...u, selected: !u.selected } : u
+      )
+    );
+  };
+
   const handleCreateTickets = async () => {
     const selectedItems = actionItems.filter((item) => item.selected);
     if (selectedItems.length === 0) return;
 
     setIsCreatingTickets(true);
+    setError(null);
 
-    // TODO: Connect to Jira API
-    setTimeout(() => {
-      alert(`Created ${selectedItems.length} tickets in Jira!`);
+    try {
+      const response = await fetch("/api/jira/create-tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tickets: selectedItems.map((item) => ({
+            task: item.task,
+            assignee: item.assignee,
+            priority: item.priority,
+            project: selectedProject,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to create tickets");
+      }
+
+      setCreatedTickets(data.created || []);
+      if (data.failed?.length > 0) {
+        setError(`${data.failed.length} ticket(s) failed to create`);
+      }
+      // Remove created items
+      setActionItems((items) => items.filter((i) => !i.selected));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create tickets");
+    } finally {
       setIsCreatingTickets(false);
-      setActionItems([]);
-      setTranscript("");
-    }, 1000);
+    }
+  };
+
+  const handleUpdateTickets = async () => {
+    const selectedUpdates = ticketUpdates.filter((u) => u.selected);
+    if (selectedUpdates.length === 0) return;
+
+    setIsUpdatingTickets(true);
+    setError(null);
+
+    const results: UpdatedTicket[] = [];
+    const errors: string[] = [];
+
+    for (const update of selectedUpdates) {
+      try {
+        const response = await fetch("/api/jira/update-ticket", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            issueKey: update.issueKey,
+            targetStatus: update.targetStatus,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          results.push({ issueKey: update.issueKey, newStatus: update.targetStatus });
+        } else {
+          errors.push(`${update.issueKey}: ${data.error}`);
+        }
+      } catch {
+        errors.push(`${update.issueKey}: Network error`);
+      }
+    }
+
+    setUpdatedTickets(results);
+    if (errors.length > 0) {
+      setError(errors.join("\n"));
+    }
+    // Remove updated items
+    const updatedKeys = new Set(results.map((r) => r.issueKey));
+    setTicketUpdates((updates) => updates.filter((u) => !updatedKeys.has(u.issueKey)));
+    setIsUpdatingTickets(false);
+  };
+
+  const handleClear = () => {
+    setActionItems([]);
+    setTicketUpdates([]);
+    setCreatedTickets([]);
+    setUpdatedTickets([]);
+    setError(null);
   };
 
   const priorityColors = {
@@ -80,17 +196,47 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
     low: darkMode ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700",
   };
 
+  const statusColors: Record<string, string> = {
+    "To Do": darkMode ? "bg-slate-700 text-slate-300" : "bg-slate-100 text-slate-700",
+    "In Progress": darkMode ? "bg-blue-900/30 text-blue-400" : "bg-blue-100 text-blue-700",
+    "Testing": darkMode ? "bg-purple-900/30 text-purple-400" : "bg-purple-100 text-purple-700",
+    "Done": darkMode ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700",
+  };
+
   return (
     <div>
       <div className="mb-6">
         <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Process Transcript</h2>
         <p className={darkMode ? "text-slate-400" : "text-gray-500"}>
-          Paste your meeting transcript and extract action items
+          Paste your meeting transcript to extract action items and ticket updates
         </p>
       </div>
 
-      {/* Transcript Input */}
+      {/* Project Selector + Transcript Input */}
       <div className="mb-6">
+        <div className="flex gap-3 mb-3">
+          <div>
+            <label className={`text-sm font-medium mb-1 block ${darkMode ? "text-slate-300" : "text-slate-700"}`}>
+              Project for new tickets
+            </label>
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className={`px-4 py-2.5 rounded-xl border transition-all ${
+                darkMode
+                  ? "bg-slate-800 border-slate-700 text-white"
+                  : "bg-white border-gray-300 text-gray-900"
+              }`}
+            >
+              {PROJECTS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <textarea
           value={transcript}
           onChange={(e) => setTranscript(e.target.value)}
@@ -108,14 +254,16 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
         >
           {isProcessing ? "Processing..." : "Extract Action Items"}
         </button>
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="mt-3 text-sm text-red-500 whitespace-pre-line">{error}</p>
+        )}
       </div>
 
-      {/* Action Items */}
+      {/* New Action Items */}
       {actionItems.length > 0 && (
-        <div className={`rounded-2xl p-6 border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
+        <div className={`rounded-2xl p-6 border mb-6 ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
           <h3 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
-            Action Items Found
+            New Action Items
           </h3>
 
           <div className="space-y-3 mb-6">
@@ -159,10 +307,10 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
             >
               {isCreatingTickets
                 ? "Creating..."
-                : `Create ${actionItems.filter((i) => i.selected).length} Jira Tickets`}
+                : `Create ${actionItems.filter((i) => i.selected).length} Ticket${actionItems.filter((i) => i.selected).length !== 1 ? "s" : ""} in ${selectedProject}`}
             </button>
             <button
-              onClick={() => setActionItems([])}
+              onClick={handleClear}
               className={`px-6 py-2.5 rounded-xl transition-colors border ${
                 darkMode
                   ? "border-slate-600 text-slate-300 hover:bg-slate-700"
@@ -174,7 +322,107 @@ export default function TranscriptProcessor({ darkMode = false }: TranscriptProc
           </div>
         </div>
       )}
-      {!isProcessing && !error && actionItems.length === 0 && (
+
+      {/* Ticket Updates */}
+      {ticketUpdates.length > 0 && (
+        <div className={`rounded-2xl p-6 border mb-6 ${darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200"}`}>
+          <h3 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
+            Ticket Status Updates
+          </h3>
+
+          <div className="space-y-3 mb-6">
+            {ticketUpdates.map((update) => (
+              <div
+                key={update.issueKey}
+                className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                  update.selected
+                    ? darkMode
+                      ? "border-violet-500/50 bg-violet-900/20"
+                      : "border-blue-200 bg-blue-50"
+                    : darkMode
+                      ? "border-slate-700 bg-slate-800/50"
+                      : "border-gray-200"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={update.selected}
+                  onChange={() => toggleUpdate(update.issueKey)}
+                  className="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                />
+                <div className="flex-1">
+                  <p className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>
+                    {update.issueKey}
+                  </p>
+                  {update.reason && (
+                    <p className={`text-sm ${darkMode ? "text-slate-400" : "text-gray-500"}`}>{update.reason}</p>
+                  )}
+                </div>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[update.targetStatus] || (darkMode ? "bg-slate-700 text-slate-300" : "bg-slate-100 text-slate-700")}`}>
+                  → {update.targetStatus}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleUpdateTickets}
+            disabled={isUpdatingTickets || !ticketUpdates.some((u) => u.selected)}
+            className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/25"
+          >
+            {isUpdatingTickets
+              ? "Updating..."
+              : `Update ${ticketUpdates.filter((u) => u.selected).length} Ticket${ticketUpdates.filter((u) => u.selected).length !== 1 ? "s" : ""}`}
+          </button>
+        </div>
+      )}
+
+      {/* Success Messages */}
+      {createdTickets.length > 0 && (
+        <div className={`rounded-2xl p-6 border mb-6 ${darkMode ? "bg-emerald-900/20 border-emerald-800" : "bg-green-50 border-green-200"}`}>
+          <h3 className={`text-lg font-semibold mb-3 ${darkMode ? "text-emerald-400" : "text-green-800"}`}>
+            Tickets Created
+          </h3>
+          <div className="space-y-2">
+            {createdTickets.map((t) => (
+              <div key={t.key} className="flex items-center gap-3">
+                <span className={`font-mono text-sm font-medium ${darkMode ? "text-emerald-300" : "text-green-700"}`}>
+                  {t.key}
+                </span>
+                <span className={darkMode ? "text-slate-300" : "text-gray-700"}>{t.task}</span>
+                <a
+                  href={t.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-500 hover:text-violet-600 text-sm ml-auto"
+                >
+                  Open →
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {updatedTickets.length > 0 && (
+        <div className={`rounded-2xl p-6 border mb-6 ${darkMode ? "bg-blue-900/20 border-blue-800" : "bg-blue-50 border-blue-200"}`}>
+          <h3 className={`text-lg font-semibold mb-3 ${darkMode ? "text-blue-400" : "text-blue-800"}`}>
+            Tickets Updated
+          </h3>
+          <div className="space-y-2">
+            {updatedTickets.map((t) => (
+              <div key={t.issueKey} className="flex items-center gap-3">
+                <span className={`font-mono text-sm font-medium ${darkMode ? "text-blue-300" : "text-blue-700"}`}>
+                  {t.issueKey}
+                </span>
+                <span className={darkMode ? "text-slate-300" : "text-gray-700"}>→ {t.newStatus}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!isProcessing && !error && actionItems.length === 0 && ticketUpdates.length === 0 && createdTickets.length === 0 && updatedTickets.length === 0 && (
         <p className={`text-sm ${darkMode ? "text-slate-500" : "text-gray-500"}`}>No action items yet.</p>
       )}
     </div>

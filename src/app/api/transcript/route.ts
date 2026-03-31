@@ -43,23 +43,36 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "user",
-            content: `Analyze this meeting transcript and extract action items. For each action item, identify:
-1. The task to be done (be specific and actionable)
-2. Who should do it (assignee) - use the person's name if mentioned, otherwise "Unassigned"
-3. Priority (high, medium, or low) - use "high" only for urgent or blocking items
+            content: `Analyze this meeting transcript and extract two things:
 
-Return ONLY a valid JSON array with this exact format, no other text or explanation:
-[
-  {
-    "task": "description of the task",
-    "assignee": "person name or Unassigned",
-    "priority": "high"
-  }
-]
+1. **New action items** - tasks that need to be created
+2. **Ticket updates** - references to existing Jira tickets that need status changes (look for patterns like "NTRVSTA-123", "ARC-45", or mentions of moving tickets to done/in progress/testing)
 
-If there are no clear action items, return an empty array: []
+Return ONLY valid JSON with this exact format, no other text:
+{
+  "actionItems": [
+    {
+      "task": "description of the task",
+      "assignee": "person name or Unassigned",
+      "priority": "high"
+    }
+  ],
+  "ticketUpdates": [
+    {
+      "issueKey": "NTRVSTA-123",
+      "targetStatus": "Done",
+      "reason": "brief reason from transcript"
+    }
+  ]
+}
 
-Here is the transcript:
+Rules:
+- For action items: be specific and actionable. Use "high" priority only for urgent/blocking items.
+- For ticket updates: only include if a specific ticket key is mentioned AND a status change is discussed.
+- Valid statuses: "To Do", "In Progress", "Testing", "Done"
+- If no action items found, use empty array. Same for ticket updates.
+
+Transcript:
 ${transcript}`,
           },
         ],
@@ -79,38 +92,64 @@ ${transcript}`,
     const content = data.content[0]?.text || "[]";
 
     // Parse the JSON from Claude's response
-    let parsedItems = [];
+    let parsed: { actionItems?: unknown[]; ticketUpdates?: unknown[] } = { actionItems: [], ticketUpdates: [] };
     try {
-      // Find JSON array in the response (in case there's extra text)
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        parsedItems = JSON.parse(jsonMatch[0]);
+        parsed = JSON.parse(jsonMatch[0]);
       }
     } catch (parseError) {
-      console.error("Failed to parse Claude response:", content);
-      return NextResponse.json(
-        { error: "Failed to parse action items" },
-        { status: 500 }
-      );
+      // Fallback: try parsing as array (old format)
+      try {
+        const arrayMatch = content.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+          parsed = { actionItems: JSON.parse(arrayMatch[0]), ticketUpdates: [] };
+        }
+      } catch {
+        console.error("Failed to parse Claude response:", content);
+        return NextResponse.json(
+          { error: "Failed to parse action items" },
+          { status: 500 }
+        );
+      }
     }
 
-    // Normalize and add IDs
-    const items: ActionItem[] = parsedItems
+    // Normalize action items
+    const items: ActionItem[] = (parsed.actionItems || [])
       .filter(
-        (item: { task?: string; assignee?: string; priority?: string }) =>
-          item &&
-          typeof item.task === "string" &&
-          item.task.trim().length > 0
+        (item: unknown) => {
+          const i = item as { task?: string };
+          return i && typeof i.task === "string" && i.task.trim().length > 0;
+        }
       )
-      .map((item: { task: string; assignee?: string; priority?: string }, index: number) => ({
-        id: String(index + 1),
-        task: item.task.trim(),
-        assignee: (item.assignee || "Unassigned").trim(),
-        priority: (item.priority || "medium") as Priority,
-        selected: true,
-      }));
+      .map((item: unknown, index: number) => {
+        const i = item as { task: string; assignee?: string; priority?: string };
+        return {
+          id: String(index + 1),
+          task: i.task.trim(),
+          assignee: (i.assignee || "Unassigned").trim(),
+          priority: (i.priority || "medium") as Priority,
+          selected: true,
+        };
+      });
 
-    return NextResponse.json({ items });
+    // Normalize ticket updates
+    const ticketUpdates = (parsed.ticketUpdates || [])
+      .filter((u: unknown) => {
+        const update = u as { issueKey?: string; targetStatus?: string };
+        return update && typeof update.issueKey === "string" && typeof update.targetStatus === "string";
+      })
+      .map((u: unknown) => {
+        const update = u as { issueKey: string; targetStatus: string; reason?: string };
+        return {
+          issueKey: update.issueKey,
+          targetStatus: update.targetStatus,
+          reason: update.reason || "",
+          selected: true,
+        };
+      });
+
+    return NextResponse.json({ items, ticketUpdates });
   } catch (error) {
     console.error("Error processing transcript:", error);
     return NextResponse.json(
